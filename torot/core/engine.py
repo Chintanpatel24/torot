@@ -1,7 +1,7 @@
 """
 Torot Scan Engine.
-Orchestrates all security tool scanners concurrently,
-feeds updates into the TUI dashboard, and produces a final report.
+Orchestrates all security tool scanners concurrently.
+Works with any subset of installed tools — minimum 1 required.
 """
 
 from __future__ import annotations
@@ -9,100 +9,110 @@ import asyncio
 import time
 from typing import Callable, Optional
 
-from torot.core.models import ScanSession, ToolStatus, ToolResult
+from torot.core.models import ScanSession, ToolStatus, ToolResult, ApiConfig
 from torot.core.detector import detect_project
-from torot.scanners.all_scanners import (
-    SlitherScanner,
-    AderynScanner, MythrilScanner, ManticoreScanner,
-    EchidnaScanner, SecurifyScanner, SolhintScanner,
-    OyenteScanner, SmartCheckScanner, HalmosScanner,
-)
-
-ALL_SCANNER_CLASSES = [
-    SlitherScanner,
-    AderynScanner,
-    MythrilScanner,
-    ManticoreScanner,
-    EchidnaScanner,
-    SecurifyScanner,
-    SolhintScanner,
-    OyenteScanner,
-    SmartCheckScanner,
-    HalmosScanner,
-]
+from torot.scanners.all_scanners import ALL_SCANNERS
 
 
 class ScanEngine:
     def __init__(
         self,
-        target_path: str,
+        target_path:      str,
         on_status_change: Optional[Callable] = None,
-        max_concurrent: int = 4,
+        max_concurrent:   int  = 5,
+        api_config:       Optional[ApiConfig] = None,
     ):
-        self.target_path = target_path
+        self.target_path      = target_path
         self.on_status_change = on_status_change
-        self.max_concurrent = max_concurrent
-        self.session = ScanSession(target_path=target_path)
+        self.max_concurrent   = max_concurrent
+        self.session          = ScanSession(
+            target_path=target_path,
+            api_config=api_config,
+        )
+
+    # ------------------------------------------------------------------ #
+    #  Public API                                                          #
+    # ------------------------------------------------------------------ #
 
     async def run(self) -> ScanSession:
-        """
-        Full scan pipeline:
-        1. Detect project languages & files
-        2. Run all scanners concurrently (with concurrency limit)
-        3. Collect results into session
-        4. Return completed session
-        """
-        # Step 1: Detect project
+        # 1. Detect project files
         try:
             languages, files = detect_project(self.target_path)
             self.session.detected_languages = languages
-            self.session.detected_files = files
-        except FileNotFoundError as e:
+            self.session.detected_files     = files
+        except FileNotFoundError:
             raise
 
-        # Step 2: Initialize all scanner instances
+        # 2. Build scanner instances
         scanners = []
-        for cls in ALL_SCANNER_CLASSES:
-            def make_callback(tool_name):
-                def callback(tn, status, message):
-                    # Update session result
-                    if tn not in self.session.tool_results:
-                        self.session.tool_results[tn] = ToolResult(
-                            tool_name=tn, status=status
-                        )
-                    self.session.tool_results[tn].status = status
-                    # Forward to dashboard
-                    if self.on_status_change:
-                        self.on_status_change(tn, status, message)
-                return callback
-
+        for cls in ALL_SCANNERS:
             scanner = cls(
                 target_path=self.target_path,
-                on_status_change=make_callback(cls.tool_name),
+                on_status_change=self._make_callback(cls.tool_name),
             )
-            # Pre-register each tool in session
             self.session.tool_results[cls.tool_name] = ToolResult(
                 tool_name=cls.tool_name,
                 status=ToolStatus.PENDING,
             )
             scanners.append(scanner)
 
-        # Step 3: Run with semaphore to limit concurrent tools
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        # 3. Run concurrently with semaphore
+        sem = asyncio.Semaphore(self.max_concurrent)
 
-        async def bounded_scan(scanner):
-            async with semaphore:
+        async def bounded(scanner):
+            async with sem:
                 result = await scanner.scan()
-                # Merge result into session
                 self.session.tool_results[scanner.tool_name] = result
                 return result
 
-        tasks = [bounded_scan(s) for s in scanners]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*[bounded(s) for s in scanners], return_exceptions=True)
+
+        # 4. Enrich bugs: reproduction guides + production path
+        from torot.core.reproduction import enrich_bugs_with_reproduction
+        all_bugs = []
+        for result in self.session.tool_results.values():
+            if result.bugs:
+                result.bugs = enrich_bugs_with_reproduction(result.bugs)
+                all_bugs.extend(result.bugs)
+
+        # 5. Optional API enrichment
+        if self.session.api_config and self.session.api_config.has_ai():
+            try:
+                from torot.core.api_enricher import run_api_enrichment
+                run_api_enrichment(
+                    self.session,
+                    log=lambda m: self.on_status_change("api", ToolStatus.RUNNING, m)
+                    if self.on_status_change else None,
+                )
+            except Exception:
+                pass
 
         self.session.end_time = time.time()
         return self.session
 
+    # ------------------------------------------------------------------ #
+    #  Helpers                                                             #
+    # ------------------------------------------------------------------ #
+
+    def _make_callback(self, tool_name: str) -> Callable:
+        def callback(tn: str, status: ToolStatus, message: str):
+            if tn in self.session.tool_results:
+                self.session.tool_results[tn].status = status
+            if self.on_status_change:
+                self.on_status_change(tn, status, message)
+        return callback
+
     @property
     def all_tool_names(self) -> list[str]:
-        return [cls.tool_name for cls in ALL_SCANNER_CLASSES]
+        return [cls.tool_name for cls in ALL_SCANNERS]
+
+    def installed_tool_count(self) -> int:
+        """Count tools actually available in PATH."""
+        import shutil
+        count = 0
+        for cls in ALL_SCANNERS:
+            for b in cls.binary_names:
+                if shutil.which(b):
+                    count += 1
+                    break
+        return count

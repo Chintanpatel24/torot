@@ -1,6 +1,9 @@
 """
 Torot Report Generator.
-Produces a detailed Markdown report from a completed ScanSession.
+Produces a professional Markdown security report from a completed ScanSession.
+Includes: executive summary, tool table, detailed findings per severity,
+          production path, reproduction steps, PoC script, Foundry test,
+          video recording guide, and official disclosure template.
 """
 
 from __future__ import annotations
@@ -13,177 +16,289 @@ from torot.core.models import ScanSession, Severity, Bug, ToolStatus
 
 SEVERITY_ORDER = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO]
 
+SEV_BADGES = {
+    "CRITICAL": "CRITICAL",
+    "HIGH":     "HIGH",
+    "MEDIUM":   "MEDIUM",
+    "LOW":      "LOW",
+    "INFO":     "INFO",
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public API
+# ─────────────────────────────────────────────────────────────────────────────
 
 def generate_report(session: ScanSession, output_path: str | None = None) -> str:
-    """
-    Generate a Markdown report and write it to disk.
-    Returns the path to the saved file.
-    """
     if output_path is None:
         ts = time.strftime("%Y%m%d_%H%M%S")
         output_path = f"torot_report_{ts}.md"
-
-    content = _build_markdown(session)
+    content = _build(session)
     Path(output_path).write_text(content, encoding="utf-8")
     return output_path
 
 
-def _build_markdown(session: ScanSession) -> str:
-    lines: list[str] = []
-    ts = time.strftime("%Y-%m-%d %H:%M:%S")
-    summary = session.bug_summary
-    all_bugs = session.all_bugs
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal builder
+# ─────────────────────────────────────────────────────────────────────────────
 
-    # ── Header ──────────────────────────────────────────────────────────────
-    lines += [
-        "# 🔍 Torot Security Analysis Report",
+def _build(session: ScanSession) -> str:
+    L: list[str] = []
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    # ── Header ───────────────────────────────────────────────────────────────
+    L += [
+        "# Torot Security Analysis Report",
         "",
-        f"> **Generated:** {ts}  ",
-        f"> **Target:** `{session.target_path}`  ",
-        f"> **Duration:** {session.duration:.1f}s  ",
-        f"> **Languages Detected:** {', '.join(session.detected_languages) or 'N/A'}  ",
-        f"> **Files Scanned:** {len(session.detected_files)}  ",
+        f"> **Generated:** {ts}",
+        f"> **Target:** `{session.target_path}`",
+        f"> **Duration:** {session.duration:.1f}s",
+        f"> **Languages:** {', '.join(session.detected_languages) or 'N/A'}",
+        f"> **Files scanned:** {len(session.detected_files)}",
+        f"> **Tools run:** {session.tools_ran} of {len(session.tool_results)} available",
         "",
         "---",
         "",
     ]
 
-    # ── Executive Summary ───────────────────────────────────────────────────
-    lines += [
-        "## 📊 Executive Summary",
+    # ── Executive Summary ────────────────────────────────────────────────────
+    summary = session.bug_summary
+    total   = session.total_bugs
+
+    L += [
+        "## Executive Summary",
         "",
-        f"| Severity | Count |",
-        f"|----------|-------|",
+        "| Severity | Count |",
+        "|----------|-------|",
     ]
-    total = 0
     for sev in SEVERITY_ORDER:
         count = summary.get(sev.value, 0)
-        total += count
-        emoji = sev.emoji
-        lines.append(f"| {emoji} **{sev.value}** | {count} |")
-    lines += [
-        f"| **TOTAL** | **{total}** |",
+        L.append(f"| **{sev.value}** | {count} |")
+    L += [f"| **TOTAL** | **{total}** |", "", "---", ""]
+
+    # ── Tool Pipeline Table ──────────────────────────────────────────────────
+    L += [
+        "## Tool Pipeline Results",
         "",
+        "| Tool | Status | Issues | Duration | Notes |",
+        "|------|--------|--------|----------|-------|",
     ]
+    for name, result in session.tool_results.items():
+        icon     = result.status.icon
+        label    = result.status.value
+        count    = len(result.bugs)
+        dur      = f"{result.duration:.1f}s" if result.duration else "—"
+        note     = result.error[:60] if result.error else ("not found in PATH" if result.status == ToolStatus.NOT_INSTALLED else "")
+        L.append(f"| **{name}** | `{icon} {label}` | {count} | {dur} | {note} |")
+    L += ["", "---", ""]
 
-    # ── Tool Results Overview ────────────────────────────────────────────────
-    lines += [
-        "## ⚙️ Tool Pipeline Results",
-        "",
-        "| Tool | Status | Bugs Found | Duration |",
-        "|------|--------|-----------|----------|",
-    ]
-    for tool_name, result in session.tool_results.items():
-        status_icon = result.status.icon
-        status_label = result.status.value
-        bug_count = len(result.bugs)
-        duration = f"{result.duration:.1f}s" if result.duration else "—"
-        lines.append(f"| **{tool_name}** | {status_icon} {status_label} | {bug_count} | {duration} |")
-    lines += ["", "---", ""]
+    # ── Detailed Findings ────────────────────────────────────────────────────
+    L += ["## Detailed Findings", ""]
 
-    # ── Bugs by Severity ────────────────────────────────────────────────────
-    lines += ["## 🐛 Detailed Findings", ""]
-
-    bugs_by_severity: dict[str, list[Bug]] = {s.value: [] for s in SEVERITY_ORDER}
-    for bug in all_bugs:
-        bugs_by_severity[bug.severity.value].append(bug)
+    bugs_by_sev: dict[str, list[Bug]] = {s.value: [] for s in SEVERITY_ORDER}
+    for bug in session.all_bugs:
+        bugs_by_sev[bug.severity.value].append(bug)
 
     for sev in SEVERITY_ORDER:
-        bugs = bugs_by_severity[sev.value]
+        bugs = bugs_by_sev[sev.value]
         if not bugs:
             continue
+        L += [f"### {sev.value} — {len(bugs)} finding(s)", ""]
 
-        lines += [
-            f"### {sev.emoji} {sev.value} Severity — {len(bugs)} Issue(s)",
+        for idx, bug in enumerate(bugs, 1):
+            L += _render_bug(idx, bug)
+
+    # ── Not Installed ────────────────────────────────────────────────────────
+    missing = [n for n, r in session.tool_results.items() if r.status == ToolStatus.NOT_INSTALLED]
+    if missing:
+        L += [
+            "---",
+            "",
+            "## Tools Not Installed",
+            "",
+            "The following tools were not found in PATH and were skipped.",
+            "Install them to increase coverage:",
             "",
         ]
+        for t in missing:
+            L.append(f"- `{t}`")
+        L += [""]
 
-        for i, bug in enumerate(bugs, 1):
-            lines += [
-                f"#### {i}. {bug.title}",
-                "",
-                f"- **Tool:** `{bug.tool}`",
-                f"- **Severity:** {bug.severity.emoji} `{bug.severity.value}`",
-                f"- **Type:** `{bug.bug_type or 'general'}`",
-                f"- **Location:** `{bug.location}`" if bug.location != "unknown" else "- **Location:** N/A",
-                "",
-                "**Description:**",
-                "",
-                f"{bug.description}",
-                "",
-            ]
-
-            if bug.code_snippet:
-                lines += [
-                    "**Buggy Code:**",
-                    "",
-                    "```solidity" if bug.tool not in ("aderyn",) else "```rust",
-                    bug.code_snippet,
-                    "```",
-                    "",
-                ]
-
-            if bug.impact:
-                lines += [
-                    "**Potential Impact:**",
-                    "",
-                    f"> ⚠️ {bug.impact}",
-                    "",
-                ]
-
-            if bug.fix_suggestion:
-                lines += [
-                    "**Fix / Recommendation:**",
-                    "",
-                    f"```",
-                    bug.fix_suggestion,
-                    "```",
-                    "",
-                ]
-
-            if bug.references:
-                lines += ["**References:**", ""]
-                for ref in bug.references:
-                    if ref.strip():
-                        lines.append(f"- {ref}")
-                lines.append("")
-
-            lines.append("---")
-            lines.append("")
-
-    # ── Not Installed Tools ──────────────────────────────────────────────────
-    not_installed = [
-        name for name, result in session.tool_results.items()
-        if result.status == ToolStatus.NOT_INSTALLED
-    ]
-    if not_installed:
-        lines += [
-            "## 🔧 Tools Not Installed",
-            "",
-            "The following tools were not found in PATH and were skipped:",
-            "",
-        ]
-        for tool in not_installed:
-            lines.append(f"- `{tool}`")
-        lines += [
-            "",
-            "> Install missing tools to get more comprehensive coverage.",
-            "",
-        ]
-
-    # ── Footer ───────────────────────────────────────────────────────────────
-    lines += [
+    # ── About ────────────────────────────────────────────────────────────────
+    L += [
         "---",
         "",
-        "## ℹ️ About Torot",
+        "## About Torot",
         "",
-        "**Torot** is an open-source blockchain & smart contract bug hunting tool.",
-        "It orchestrates industry-standard security tools and produces unified reports.",
+        "**Torot** is an open-source blockchain and smart contract security scanner.",
+        "It orchestrates industry-standard tools and produces unified reports with",
+        "reproduction guides, Foundry tests, and disclosure templates.",
         "",
-        "- GitHub: [github.com/your-org/torot](https://github.com/your-org/torot)",
-        "- Powered by: Slither, Aderyn, Mythril, Manticore, Echidna, Securify2, solhint, Oyente, SmartCheck, Halmos",
-        "",
-        f"*Report generated by Torot v1.0.0 at {ts}*",
+        f"*Report generated by Torot v1.0.0 — {ts}*",
     ]
 
-    return "\n".join(lines)
+    return "\n".join(L)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-bug section renderer
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _render_bug(idx: int, bug: Bug) -> list[str]:
+    L: list[str] = []
+
+    L += [
+        f"#### Finding {idx}: {bug.title}",
+        "",
+        f"| Field | Value |",
+        f"|-------|-------|",
+        f"| **Severity** | `{bug.severity.value}` |",
+        f"| **Tool** | `{bug.tool}` |",
+        f"| **Type** | `{bug.bug_type or 'general'}` |",
+        f"| **Location** | `{bug.location}` |",
+        "",
+    ]
+
+    # Description
+    L += ["**Description**", "", bug.description, ""]
+
+    # Vulnerable code
+    if bug.code_snippet:
+        lang = "rust" if bug.tool in ("aderyn", "cargo-audit", "clippy") else "solidity"
+        L += [
+            "**Vulnerable Code**",
+            "",
+            f"```{lang}",
+            bug.code_snippet.strip(),
+            "```",
+            "",
+        ]
+
+    # Production path
+    if bug.production_path:
+        L += [
+            "**Where This Bug Appears in Production**",
+            "",
+            bug.production_path,
+            "",
+        ]
+
+    # AI analysis (if enriched)
+    if bug.ai_analysis:
+        L += [
+            "**AI Analysis**",
+            "",
+            f"> {bug.ai_analysis}",
+            "",
+        ]
+
+    # Impact
+    if bug.impact:
+        L += ["**Impact**", "", bug.impact, ""]
+
+    # Fix
+    if bug.fix_suggestion:
+        L += [
+            "**Recommended Fix**",
+            "",
+            "```",
+            bug.fix_suggestion.strip(),
+            "```",
+            "",
+        ]
+
+    # References
+    if bug.references:
+        refs = [r for r in bug.references if r.strip()]
+        if refs:
+            L += ["**References**", ""]
+            for r in refs:
+                L.append(f"- {r}")
+            L.append("")
+
+    # Reproduction guide
+    if bug.reproduction:
+        L += _render_reproduction(bug)
+
+    L += ["---", ""]
+    return L
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reproduction section
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _render_reproduction(bug: Bug) -> list[str]:
+    rep = bug.reproduction
+    L: list[str] = []
+
+    L += [
+        "<details>",
+        f"<summary><strong>Reproduction Guide</strong></summary>",
+        "",
+    ]
+
+    # Environment setup
+    if rep.environment_setup:
+        L += [
+            "**Environment Setup**",
+            "",
+            "```bash",
+            rep.environment_setup.strip(),
+            "```",
+            "",
+        ]
+
+    # Steps
+    if rep.steps:
+        L += ["**Reproduction Steps**", ""]
+        for i, step in enumerate(rep.steps, 1):
+            L.append(f"{i}. {step}")
+        L.append("")
+
+    # PoC script
+    if rep.poc_script:
+        L += [
+            "**Proof-of-Concept Script**",
+            "",
+            "```python",
+            rep.poc_script.strip(),
+            "```",
+            "",
+        ]
+
+    # Foundry test
+    if rep.foundry_test:
+        L += [
+            "**Foundry Test**",
+            "",
+            "```solidity",
+            rep.foundry_test.strip(),
+            "```",
+            "",
+        ]
+
+    # Video guide
+    if rep.video_guide:
+        L += [
+            "**Video Recording Guide**",
+            "",
+            "```",
+            rep.video_guide.strip(),
+            "```",
+            "",
+        ]
+
+    # Disclosure template
+    if rep.disclosure_template:
+        L += [
+            "**Official Disclosure Template**",
+            "",
+            "```",
+            rep.disclosure_template.strip(),
+            "```",
+            "",
+        ]
+
+    L += ["</details>", ""]
+    return L
