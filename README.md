@@ -15,17 +15,17 @@
 
 ## ✨ Features
 
-- 🤖 **Agent-style orchestration** — Runs all installed tools automatically, in parallel
-- 📊 **Live TUI Dashboard** — Real-time terminal dashboard (like `htop`) showing each tool's progress, bug count, and log feed
-- 🔍 **10 Tools Integrated** — Slither, Aderyn, Mythril, Manticore, Echidna, Securify2, solhint, Oyente, SmartCheck, Halmos
-- 📝 **Rich Markdown Report** — Detailed `.md` with bug descriptions, severity, code snippets, and fix suggestions
-- ⚡ **Concurrent Execution** — Configurable parallelism for fast scans
-- 🦀 **Rust + Python** — Python orchestration with Rust tooling (Aderyn)
-- 🎯 **Auto-detection** — Detects Solidity/Rust/EVM files automatically
+-  **Agent-style orchestration** — Runs all installed tools automatically, in parallel
+-  **Live TUI Dashboard** — Real-time terminal dashboard (like `htop`) showing each tool's progress, bug count, and log feed
+-  **10 Tools Integrated** — Slither, Aderyn, Mythril, Manticore, Echidna, Securify2, solhint, Oyente, SmartCheck, Halmos
+-  **Rich Markdown Report** — Detailed `.md` with bug descriptions, severity, code snippets, and fix suggestions
+-  **Concurrent Execution** — Configurable parallelism for fast scans
+-  **Rust + Python** — Python orchestration with Rust tooling (Aderyn)
+-  **Auto-detection** — Detects Solidity/Rust/EVM files automatically
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Install Torot
 
@@ -36,7 +36,7 @@ pip install torot
 Or from source:
 
 ```bash
-git clone https://github.com/your-org/torot
+git clone https://github.com/Chintanpatel24/torot
 cd torot
 pip install -e .
 ```
@@ -59,7 +59,7 @@ torot ./my-contracts/ --concurrent 3
 
 ---
 
-## 🖥️ Dashboard
+##  Dashboard
 
 When you run `torot`, a live TUI dashboard opens in your terminal showing:
 
@@ -67,7 +67,7 @@ When you run `torot`, a live TUI dashboard opens in your terminal showing:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          TOROT DASHBOARD                             │
 │  Target: ./my-contracts/  |  Elapsed: 42.3s                         │
-├──────────────────────────────┬──────────────────────────────────────┤
+├──────────────────────────────┬───────────────────────────── ─────────┤
 │  ⚙ Tool Pipeline             │  🐛 Bug Summary                      │
 │                              │                                       │
 │  slither    ✔ completed  12  │  💀 CRITICAL   ██                 2  │
@@ -85,7 +85,7 @@ When you run `torot`, a live TUI dashboard opens in your terminal showing:
 
 ---
 
-## 🛠️ Supported Tools
+##  Supported Tools
 
 | Tool | Type | Detects |
 |------|------|---------|
@@ -104,7 +104,7 @@ When you run `torot`, a live TUI dashboard opens in your terminal showing:
 
 ---
 
-## 📦 Installing the Security Tools
+##  Installing the Security Tools
 
 ### Slither
 ```bash
@@ -152,20 +152,20 @@ pip install manticore[native]
 
 Torot generates a `torot_report_<timestamp>.md` with:
 
-- 📊 **Executive Summary** — bug counts by severity
-- ⚙️ **Tool Results Table** — which tools ran, how long, how many issues
-- 🐛 **Detailed Findings** — for each bug:
+-  **Executive Summary** — bug counts by severity
+-  **Tool Results Table** — which tools ran, how long, how many issues
+-  **Detailed Findings** — for each bug:
   - Title, severity, tool, location (file:line)
   - Description of the bug
   - Buggy code snippet
   - Potential impact
   - Fix / recommendation
   - Reference links
-- 🔧 **Missing Tools** — list of tools not installed
+-  **Missing Tools** — list of tools not installed
 
 ---
 
-## 🧰 CLI Reference
+##  CLI Reference
 
 ```
 torot <path> [options]
@@ -183,7 +183,7 @@ Options:
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 torot/
@@ -201,23 +201,3 @@ torot/
 └── report/
     └── generator.py        ← Markdown report generator
 ```
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! Adding a new tool is easy:
-
-1. Create `torot/scanners/mytool_scanner.py`
-2. Subclass `BaseScanner` and implement `_run_tool()` and `_parse_output()`
-3. Add your class to `ALL_SCANNERS` in `torot/scanners/all_scanners.py`
-
----
-
-## 📄 License
-
-MIT — See [LICENSE](LICENSE)
-
----
-
-*Built with ❤️ for the blockchain security community.*
