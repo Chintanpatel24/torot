@@ -1,18 +1,25 @@
-# Torot — Blockchain & Smart Contract Security Scanner
+<div align=center>
 
-An open-source, agent-style CLI tool that orchestrates 17 industry-standard
-security analyzers, then produces a unified report with reproduction guides,
-Foundry tests, PoC scripts, video recording instructions, and official
-disclosure templates.
+ <pre>
 
-```
  ████████╗ ██████╗ ██████╗  ██████╗ ████████╗
     ██╔══╝██╔═══██╗██╔══██╗██╔═══██╗╚══██╔══╝
     ██║   ██║   ██║██████╔╝██║   ██║   ██║   
     ██║   ██║   ██║██╔══██╗██║   ██║   ██║   
     ██║   ╚██████╔╝██║  ██║╚██████╔╝   ██║   
     ╚═╝    ╚═════╝ ╚═╝  ╚═╝ ╚═════╝    ╚═╝   
-```
+
+</pre>
+
+</div>
+
+
+# Blockchain & Smart Contract Security Scanner
+
+An open-source, agent-style CLI tool that orchestrates 17 industry-standard
+security analyzers, then produces a unified report with reproduction guides,
+Foundry tests, PoC scripts, video recording instructions, and official
+disclosure templates.
 
 ---
 
@@ -41,7 +48,7 @@ disclosure templates.
 pip install torot
 
 # Or from source
-git clone https://github.com/your-org/torot
+git clone https://github.com/Chintanpatel24/torot
 cd torot
 pip install -e .
 
@@ -237,39 +244,8 @@ Options:
 
 ---
 
-## Architecture
-
-```
-torot/
-  cli.py                   CLI entry point (argparse)
-  core/
-    engine.py              Async orchestration engine
-    detector.py            File and language detection
-    models.py              Data models (Bug, ScanSession, ApiConfig, ...)
-    reproduction.py        PoC, Foundry test, video guide, disclosure template
-    api_enricher.py        OpenAI, Claude, Etherscan, GitHub integrations
-  scanners/
-    base.py                BaseScanner (abstract — easy to extend)
-    slither_scanner.py     Slither (full JSON parser)
-    all_scanners.py        All other 16 tool integrations + registry
-  tui/
-    dashboard.py           Rich Live TUI dashboard
-  report/
-    generator.py           Markdown report writer
-```
-
 ### Adding a New Tool
 
 1. Open `torot/scanners/all_scanners.py`
 2. Subclass `BaseScanner`, set `tool_name`, `binary_names`, implement `_run_tool()` and `_parse_output()`
 3. Append the class to `ALL_SCANNERS` at the bottom of the file
-
----
-
-## License
-
-MIT
-
----
-
-*Built for the blockchain security community.*
