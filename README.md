@@ -67,3 +67,7 @@ torot ./my-contracts/ --no-dashboard
 # Run with fewer parallel tools
 torot ./my-contracts/ --concurrent 2
 ```
+
+---
+
+## For more : [visit usage.md](usage.md)
