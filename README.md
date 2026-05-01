@@ -14,30 +14,38 @@
 </div>
 
 
-# Blockchain & Smart Contract Security Scanner
+# Torot v2 - Universal Security Agent
+- An open-source, agent-style CLI security tool that thinks and acts like an elite
+security researcher. It orchestrates 39 industry tools across blockchain, web app,
+binary, and API security - with a live Warp-style split terminal UI, persistent
+memory, and AI reasoning via Claude, GPT-4, or Ollama.
 
-An open-source, agent-style CLI tool that orchestrates 17 industry-standard
-security analyzers, then produces a unified report with reproduction guides,
-Foundry tests, PoC scripts, video recording instructions, and official
-disclosure templates.
 
 ---
 
-## Features
+## What Torot Does !!
 
-- Works with any number of installed tools — even just 1
-- Live terminal dashboard (like htop) showing each tool's real-time status
-- 17 tools integrated across Solidity and Rust codebases
-- Full per-bug reproduction section:
-  - Step-by-step exploit steps
-  - Python Proof-of-Concept script
-  - Foundry test skeleton
-  - Video recording guide (OBS, asciinema)
-  - Official disclosure template for Immunefi, Code4rena, Sherlock, HackerOne
-- API integrations: OpenAI GPT-4, Anthropic Claude, Etherscan, GitHub
-- Runs all tools concurrently with configurable parallelism
-- Gracefully skips tools that are not installed
-- Clean, professional Markdown report output
+Torot is a security research agent that:
+
+1. **Accepts any input**
+   >- folder path, contract address, or a plain security question
+
+2. **Detects the domain**
+   >- blockchain, web app, binary, or API automatically
+3. **Builds an attack plan**
+   >- AI generates a step-by-step assessment plan
+4. **Asks your approval**
+   >- semi-auto mode: you approve or skip each step
+5. **Runs all tools in parallel**
+   >- every installed tool fires concurrently
+6. **Streams everything live**
+   >- top pane shows all tool output in real time
+7. **Analyses findings with AI**
+   >- brain reviews each finding, writes PoC and disclosure
+8. **Persists to memory**
+   >- SQLite database remembers every session and finding
+9. **Exports full reports**
+    >- Markdown with reproduction guides, Foundry tests, video guides
 
 ---
 
@@ -52,20 +60,20 @@ git clone https://github.com/Chintanpatel24/torot
 cd torot
 pip install -e .
 
-# Check which tools you have installed
-torot --list-tools
+# Launch interactive mode (wizard picks AI provider)
+torot
 
-# Scan a folder (opens live TUI dashboard)
+# Direct scan — skips wizard
 torot ./my-contracts/
 
-# Save report to a custom path
-torot ./my-contracts/ --report audit.md
+# Analyze an on-chain contract
+torot 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
 
-# Plain output — no dashboard
-torot ./my-contracts/ --no-dashboard
+# Ask a security question
+torot "is tx.origin safe for authentication?"
 
-# Run with fewer parallel tools
-torot ./my-contracts/ --concurrent 2
+# Offline mode (no AI, tools still run)
+torot --no-ai ./my-contracts/
 ```
 
 ---
