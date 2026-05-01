@@ -1,4 +1,5 @@
 """
+Torot v2 — Warp-Style Split Terminal UI
 Top half: live tool output stream (scrollable)
 Bottom half: chat input + agent responses
 
