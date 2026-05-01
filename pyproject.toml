@@ -1,47 +1,27 @@
 [build-system]
-requires = ["setuptools>=65", "wheel"]
+requires      = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "torot"
-version = "1.0.0"
-description = "Blockchain & Smart Contract Bug Hunter — orchestrates Slither, Mythril, Aderyn and more"
-readme = "README.md"
-license = {text = "MIT"}
-authors = [
-    {name = "Torot Contributors"}
-]
-keywords = ["blockchain", "security", "smart-contracts", "solidity", "rust", "static-analysis", "audit"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Environment :: Console",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Topic :: Security",
-    "Topic :: Software Development :: Testing",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-]
-requires-python = ">=3.9"
+name        = "torot"
+version     = "2.0.0"
+description = "Universal Security Agent — orchestrates 40+ tools across blockchain, web, binary, and API security"
+readme      = "README.md"
+license     = {text = "MIT"}
+authors     = [{name = "Torot Contributors"}]
+keywords    = ["security", "blockchain", "smart-contracts", "hacking", "bug-bounty", "agent"]
+requires-python = ">=3.10"
 dependencies = [
-    "rich>=13.0.0",
     "textual>=0.40.0",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
 torot = "torot.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/torot"
+Homepage   = "https://github.com/your-org/torot"
 Repository = "https://github.com/your-org/torot"
-Issues = "https://github.com/your-org/torot/issues"
-
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["torot*"]
-
-[tool.setuptools.package-data]
-torot = ["py.typed"]
