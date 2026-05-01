@@ -1,179 +1,152 @@
-## API Integrations
 
-Pass API keys with `--api key=value`. Repeat for multiple keys.
-
-```bash
-# OpenAI GPT-4 analysis on each finding
-torot ./contracts/ --api openai=sk-...
-
-# Anthropic Claude fix suggestions
-torot ./contracts/ --api anthropic=sk-ant-...
-
-# Etherscan contract verification check
-torot ./contracts/ --api etherscan=ABCDEF123
-
-# Auto-open GitHub issues for CRITICAL and HIGH findings
-torot ./contracts/ --api github=ghp_TOKEN --api github-repo=owner/repo
-
-# Combine multiple APIs
-torot ./contracts/ \
-  --api anthropic=sk-ant-... \
-  --api etherscan=ABCDEF \
-  --api github=ghp_TOKEN \
-  --api github-repo=myorg/myrepo
-```
-
-### What each API does
-
-| Flag | Effect |
-|------|--------|
-| `openai=<key>` | GPT-4 analyses each CRITICAL/HIGH/MEDIUM bug and rewrites the fix suggestion |
-| `anthropic=<key>` | Claude analyses each CRITICAL/HIGH/MEDIUM bug and rewrites the fix suggestion |
-| `etherscan=<key>` | Checks whether any detected contract addresses are verified on Etherscan |
-| `github=<token>` + `github-repo=owner/repo` | Creates a GitHub issue for each CRITICAL and HIGH finding automatically |
 
 ---
 
-## Supported Tools
+## AI Providers
 
-Run `torot --list-tools` to see which are installed on your machine.
+At startup, Torot shows a provider picker:
 
-| Tool | Language | What it finds |
-|------|----------|---------------|
-| Slither | Solidity | Reentrancy, overflow, access control |
-| Aderyn | Solidity | Multi-contract issues, custom detectors |
-| Mythril | Solidity | Reentrancy, tx.origin (symbolic execution) |
-| Manticore | Solidity | Custom security property violations |
-| Echidna | Solidity | Invariant and assertion violations (fuzzing) |
-| Securify2 | Solidity | Security pattern compliance |
-| solhint | Solidity | Coding standards, linting |
-| Oyente | Solidity | Timestamp dependence, reentrancy |
-| SmartCheck | Solidity | Known vulnerability patterns (XPath) |
-| Halmos | Solidity | Formal verification (SMT) |
-| Semgrep | Solidity/Rust | Pattern-based custom rules |
-| cargo-audit | Rust | Vulnerable dependencies (RustSec DB) |
-| Clippy | Rust | Unsafe patterns, common mistakes |
-| solc | Solidity | Compiler warnings and errors |
-| Pyrometer | Solidity | Arithmetic bounds and range errors |
-| Wake | Solidity | Analysis framework with plugins |
-| 4naly3er | Solidity | Audit-contest-style report findings |
-
-Torot skips tools not installed in PATH — you do not need all 17.
-Install only the tools you want and Torot adapts automatically.
-
----
-
-## Report Contents
-
-Each bug in the report includes:
-
-1. Severity, tool, type, and location (file:line)
-2. Description
-3. Vulnerable code snippet
-4. Where the bug appears in a production deployment
-5. AI analysis (if an API key is provided)
-6. Impact
-7. Recommended fix (code-level)
-8. References (SWC, audit wiki, etc.)
-9. Full reproduction guide (inside a collapsible section):
-   - Environment setup
-   - Step-by-step exploitation walkthrough
-   - Python PoC exploit script
-   - Foundry test skeleton (`forge test`)
-   - Video recording guide (OBS setup, script, export settings)
-   - Official disclosure template (ready to submit to Immunefi, C4, Sherlock)
-
----
-
-## Installing the Tools
-
-### Slither
-```bash
-pip install slither-analyzer
+```
+1  Anthropic Claude    claude-opus-4-6  (recommended)
+2  OpenAI GPT-4        gpt-4o
+3  Ollama (local)      runs 100% offline — llama3, mistral, etc.
+4  None / offline      tools run, no AI reasoning
 ```
 
-### Aderyn
-```bash
-cargo install aderyn
-```
+Or skip the wizard with flags:
 
-### Mythril
 ```bash
-pip install mythril
-```
+# Claude
+torot --api claude=sk-ant-...
 
-### Echidna
-```bash
-# macOS
-brew install echidna
+# OpenAI
+torot --api openai=sk-...
 
-# Linux
-wget https://github.com/crytic/echidna/releases/latest/download/echidna-linux.zip
-unzip echidna-linux.zip && sudo mv echidna /usr/local/bin/
-```
+# Ollama (local, no internet needed)
+torot --api ollama --api ollama-model=llama3
 
-### solhint
-```bash
-npm install -g solhint
-```
-
-### Halmos
-```bash
-pip install halmos
-```
-
-### Semgrep
-```bash
-pip install semgrep
-```
-
-### cargo-audit
-```bash
-cargo install cargo-audit
-```
-
-### Clippy (comes with Rust)
-```bash
-rustup component add clippy
-```
-
-### solc
-```bash
-pip install solc-select
-solc-select install latest
-solc-select use latest
-```
-
-### Wake
-```bash
-pip install eth-wake
+# Etherscan + GitHub
+torot --api etherscan=ABC123 --api github=ghp_TOKEN --api github-repo=owner/repo
 ```
 
 ---
 
-## CLI Reference
+## UI — Warp-Style Split Terminal
 
 ```
-torot <path> [options]
-
-Arguments:
-  path                Path to the smart contracts or code folder
-
-Options:
-  --report FILE, -r   Output path for the Markdown report
-  --api KEY=VALUE     API key (repeatable). Keys: openai, anthropic,
-                      etherscan, github, github-repo
-  --no-dashboard      Plain terminal output, no live TUI
-  --concurrent N, -c  Max tools in parallel (default: 5)
-  --list-tools        Show all tools and install status
-  --version, -v       Show version
-  --help, -h          Show help
+┌────────────────────────────────────────────────────────────────────┐
+│ TOROT  target: ./contracts/  C:2 H:5 M:8 L:3  total:18  ai:claude  │
+├────────────────────────────────────────────────────────────────────┤
+│ Live Output                                                        │
+│                                                                    │
+│  12:34:01  > Starting: slither                                     │
+│  12:34:01  [slither] Reentrancy detected in Vault.sol:42           │
+│  12:34:05  > Starting: mythril                                     │
+│  12:34:06  [mythril] Integer overflow in Token.sol:67              │
+│  12:34:10  [CRITICAL] [slither] Reentrancy-eth  Vault.sol:42       │
+│  12:34:10  [HIGH]     [mythril] Integer Overflow Token.sol:67      │
+│  12:34:15  > Finished: slither (14.2s)                             │
+│  ...                                                               │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│ Agent Plan                                                         │
+│   1. [+] Detect languages     (internal)                           │
+│   2. [*] Static analysis      (all)          <- running            │
+│   3. [o] AI review            (ai-analysis)  <- pending            │
+│   4. [o] Generate report      (internal)                           │
+├────────────────────────────────────────────────────────────────────┤
+│ Conversation                                                       │
+│  you   ./contracts/                                                │
+│  torot Building attack plan for ./contracts/...                    │
+├────────────────────────────────────────────────────────────────────┤
+│  Step: Static analysis  |  Tool: all  |  Approve? [Approve] [Skip] │
+├────────────────────────────────────────────────────────────────────┤
+│ > Ask Torot anything, or type a target path...                     │
+└────────────────────────────────────────────────────────────────────┘
 ```
+
+**Keyboard shortcuts:**
+- `Ctrl+C` - quit
+- `Ctrl+L` - clear log
+- `Ctrl+E` - export report
+- `Ctrl+P` - show/refresh plan
+- `Escape` - cancel/skip current step
 
 ---
 
-### Adding a New Tool
+## Input Modes
 
-1. Open `torot/scanners/all_scanners.py`
-2. Subclass `BaseScanner`, set `tool_name`, `binary_names`, implement `_run_tool()` and `_parse_output()`
-3. Append the class to `ALL_SCANNERS` at the bottom of the file
+| Input | Example | What happens |
+|-------|---------|--------------|
+| Folder path | `./contracts/` | Detects languages, runs all tools, full report |
+| Contract address | `0xA0b86...` | Fetches from Etherscan, decompiles, scans |
+| Question | `is delegatecall safe?` | AI answers with memory context |
+
+---
+
+## 39 Supported Tools
+
+Run `torot --list-tools` to see which are installed.
+
+### Blockchain (17 tools)
+slither, aderyn, mythril, manticore, echidna, securify, solhint, oyente,
+smartcheck, halmos, solc, wake, 4naly3er, pyrometer, heimdall, cargo-audit, clippy
+
+### Web App (11 tools)
+nuclei, nikto, sqlmap, wfuzz, ffuf, gobuster, whatweb, dalfox, semgrep, trufflehog, gitleaks
+
+### API Security (4 tools)
+arjun, jwt_tool, kiterunner, graphqlmap
+
+### Binary / Native (7 tools)
+radare2, binwalk, checksec, strings, objdump, ltrace, strace
+
+---
+
+## Memory System
+
+Torot persists everything to `~/.torot/memory.db`:
+
+```bash
+# View past sessions
+torot --history
+
+# Export a session
+torot --export <session-id>
+```
+
+Knowledge from every session is indexed and used to answer future questions.
+
+---
+
+## Adding a New Tool
+
+1. Open `torot/tools/registry.py`
+2. Add a `ToolDef(...)` entry to `ALL_TOOLS`
+3. Add a parser in `torot/agents/orchestrator.py` → `PARSERS` dict
+4. Add command args in `_build_args()`
+
+That's it — the tool auto-appears in `--list-tools`, the wizard, and all scan flows.
+
+---
+
+## Architecture
+
+```
+torot/
+  cli.py                    Entry point (argparse + asyncio)
+  core/
+    models.py               All data types (Session, Finding, AIConfig, ...)
+    report.py               Markdown report generator
+  ui/
+    app.py                  Textual TUI (Warp-style split layout)
+    wizard.py               Startup wizard (AI provider picker)
+  agents/
+    brain.py                AI reasoning (Claude / OpenAI / Ollama)
+    controller.py           Main agent loop (drives everything)
+    orchestrator.py         Tool runner + output parser
+  tools/
+    registry.py             39 tool definitions + generic runner
+  memory/
+    store.py                SQLite persistence + export
+```
