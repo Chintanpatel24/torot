@@ -1,282 +1,180 @@
 #!/usr/bin/env python3
 """
-Torot — Blockchain & Smart Contract Security Scanner
-CLI entry point.
+Torot v2 — Universal Security Agent
+CLI Entry Point
 
 Usage:
-  torot <path>
-  torot <path> --report out.md
-  torot <path> --api openai=sk-... --api etherscan=ABC
-  torot <path> --api anthropic=sk-ant-... --api github=TOKEN --api github-repo=owner/repo
-  torot <path> --no-dashboard
-  torot <path> --concurrent 3
-  torot --list-tools
+  torot                           Interactive mode (wizard + TUI)
+  torot <path>                    Scan a folder directly
+  torot <address>                 Analyze a contract address
+  torot --list-tools              Show all tools and install status
+  torot --history                 Show past sessions
+  torot --export <session_id>     Export a past session
+  torot --no-ai                   Skip AI wizard, offline mode
+  torot --api claude=sk-ant-...   Set API key directly
   torot --version
 """
-
 from __future__ import annotations
 import asyncio
 import sys
 import os
 import argparse
-import time
-import shutil
 
 from rich.console import Console
-from rich.panel   import Panel
-from rich.table   import Table
-from rich.text    import Text
-from rich         import box
 
 console = Console()
 
-BANNER = (
-    " ████████╗ ██████╗ ██████╗  ██████╗ ████████╗\n"
-    "    ██╔══╝██╔═══██╗██╔══██╗██╔═══██╗╚══██╔══╝\n"
-    "    ██║   ██║   ██║██████╔╝██║   ██║   ██║   \n"
-    "    ██║   ██║   ██║██╔══██╗██║   ██║   ██║   \n"
-    "    ██║   ╚██████╔╝██║  ██║╚██████╔╝   ██║   \n"
-    "    ╚═╝    ╚═════╝ ╚═╝  ╚═╝ ╚═════╝    ╚═╝   \n"
-)
-
-
-def print_banner():
-    console.print(Text(BANNER, style="bold cyan", justify="center"))
-    console.print(Text(
-        "  Blockchain & Smart Contract Security Scanner  |  v1.0.0\n",
-        style="dim", justify="center"
-    ))
-
-
-def list_tools():
-    """Print a table of all known tools and their install status."""
-    from torot.scanners.all_scanners import ALL_SCANNERS
-    print_banner()
-    tbl = Table(
-        title="Torot — Supported Security Tools",
-        box=box.SIMPLE_HEAVY,
-        show_edge=True,
-        header_style="bold magenta",
-    )
-    tbl.add_column("Tool",         style="bold white", width=14)
-    tbl.add_column("Language",     width=12)
-    tbl.add_column("Installed",    width=10)
-    tbl.add_column("Description")
-
-    for cls in ALL_SCANNERS:
-        installed = any(shutil.which(b) for b in cls.binary_names)
-        status    = Text("yes", style="bold green") if installed else Text("no", style="dim red")
-        langs     = ", ".join(cls.supported_languages)
-        tbl.add_row(cls.tool_name, langs, status, cls.description)
-
-    console.print(tbl)
-    console.print()
-
-    inst_count = sum(
-        1 for cls in ALL_SCANNERS
-        if any(shutil.which(b) for b in cls.binary_names)
-    )
-    console.print(
-        f"  [bold]{inst_count}[/bold] of [bold]{len(ALL_SCANNERS)}[/bold] tools installed. "
-        f"Torot works with any subset — even 1 tool.\n"
-    )
-
 
 def parse_args():
-    parser = argparse.ArgumentParser(
+    p = argparse.ArgumentParser(
         prog="torot",
-        description="Torot — Blockchain & Smart Contract Security Scanner",
+        description="Torot v2 — Universal Security Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-API keys (--api):
-  openai=<key>        GPT-4 powered bug analysis
-  anthropic=<key>     Claude-powered fix suggestions
-  etherscan=<key>     On-chain contract verification
-  github=<token>      Auto-open GitHub issues
-  github-repo=owner/repo   Target repo for issues
-
 Examples:
-  torot ./contracts/
-  torot ./contracts/ --report audit.md
-  torot ./contracts/ --api anthropic=sk-ant-... --api github=ghp_...
-  torot ./contracts/ --no-dashboard --concurrent 3
-  torot --list-tools
+  torot                              # interactive wizard + TUI
+  torot ./contracts/                 # scan a folder
+  torot 0x1234...abcd                # analyze on-chain contract
+  torot --no-ai ./contracts/         # offline scan, no AI
+  torot --api claude=sk-ant-...      # set Claude key
+  torot --api ollama --api ollama-model=llama3
+  torot --list-tools                 # show all tools
+  torot --history                    # show past sessions
         """,
     )
-    parser.add_argument("path",         nargs="?",      help="Code folder to scan")
-    parser.add_argument("--report","-r",metavar="FILE", help="Markdown report output path")
-    parser.add_argument("--api",        action="append",metavar="KEY=VALUE",
-                        help="API key (repeatable). E.g. --api openai=sk-...")
-    parser.add_argument("--no-dashboard", action="store_true",
-                        help="Disable live TUI; use plain output")
-    parser.add_argument("--concurrent","-c", type=int, default=5,
-                        help="Max tools running in parallel (default: 5)")
-    parser.add_argument("--list-tools", action="store_true",
-                        help="List all supported tools and install status")
-    parser.add_argument("--version","-v", action="store_true",
-                        help="Show version and exit")
-    return parser.parse_args()
+    p.add_argument("target",         nargs="?",      help="Folder path, contract address, or question")
+    p.add_argument("--api",          action="append",metavar="KEY=VAL",
+                   help="API config (repeatable): claude=KEY, openai=KEY, etherscan=KEY, github=TOKEN, github-repo=owner/repo, ollama, ollama-model=MODEL, ollama-url=URL")
+    p.add_argument("--no-ai",        action="store_true", help="Skip AI, run in offline mode")
+    p.add_argument("--list-tools",   action="store_true", help="Show all tools and install status")
+    p.add_argument("--history",      action="store_true", help="Show past scan sessions")
+    p.add_argument("--export",       metavar="SESSION_ID",  help="Export a past session to Markdown")
+    p.add_argument("--concurrent","-c", type=int, default=5, help="Max parallel tools (default: 5)")
+    p.add_argument("--version","-v", action="store_true", help="Show version")
+    return p.parse_args()
 
 
-def parse_api_config(api_args: list[str] | None):
-    from torot.core.models import ApiConfig
-    cfg = ApiConfig()
-    if not api_args:
+def build_ai_config_from_args(api_args: list[str] | None, no_ai: bool):
+    from torot.core.models import AIConfig, AIProvider
+    cfg = AIConfig()
+    if no_ai:
+        cfg.provider = AIProvider.NONE
         return cfg
-    for entry in api_args:
-        if "=" not in entry:
-            console.print(f"[yellow]Warning:[/yellow] Ignoring malformed --api entry: {entry!r}")
-            continue
-        key, _, value = entry.partition("=")
-        key = key.strip().lower()
-        value = value.strip()
-        if   key == "openai":       cfg.openai_key    = value
-        elif key == "anthropic":    cfg.anthropic_key = value
-        elif key == "etherscan":    cfg.etherscan_key = value
-        elif key == "github":       cfg.github_token  = value
-        elif key == "github-repo":  cfg.github_repo   = value
+    if not api_args:
+        return None   # None = run wizard
+
+    for entry in (api_args or []):
+        if "=" in entry:
+            key, _, val = entry.partition("=")
+            key = key.strip().lower()
+            val = val.strip()
         else:
-            cfg.custom_apis[key] = value
-            console.print(f"  [dim]Custom API registered:[/dim] {key}")
+            key = entry.strip().lower()
+            val = ""
+
+        if   key == "claude":       cfg.provider = AIProvider.CLAUDE;  cfg.api_key = val
+        elif key == "anthropic":    cfg.provider = AIProvider.CLAUDE;  cfg.api_key = val
+        elif key == "openai":       cfg.provider = AIProvider.OPENAI;  cfg.api_key = val
+        elif key == "ollama":       cfg.provider = AIProvider.OLLAMA
+        elif key == "ollama-model": cfg.ollama_model = val
+        elif key == "ollama-url":   cfg.ollama_url   = val
+        elif key == "etherscan":    cfg.etherscan_key = val
+        elif key == "github":       cfg.github_token  = val
+        elif key == "github-repo":  cfg.github_repo   = val
+
     return cfg
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main scan runner
-# ─────────────────────────────────────────────────────────────────────────────
+async def run(args):
+    from torot.core.models       import Session, InputMode, Domain
+    from torot.memory.store      import MemoryStore
+    from torot.agents.controller import TorotController
+    from torot.ui.wizard         import run_startup_wizard, print_banner
 
-async def run_scan(
-    path:         str,
-    report_path:  str | None,
-    no_dashboard: bool,
-    concurrent:   int,
-    api_config,
-):
-    from torot.core.engine    import ScanEngine
-    from torot.tui.dashboard  import TorotDashboard
-    from torot.report.generator import generate_report
-    from torot.core.models    import ToolStatus
+    memory = MemoryStore()
 
-    engine     = ScanEngine(
-        target_path=path,
-        max_concurrent=concurrent,
-        api_config=api_config,
+    # ── list-tools ────────────────────────────────────────────────────────
+    if args.list_tools:
+        from torot.ui.wizard import print_tool_table, print_banner
+        print_banner()
+        print_tool_table()
+        return
+
+    # ── history ───────────────────────────────────────────────────────────
+    if args.history:
+        from torot.ui.wizard import print_banner
+        print_banner()
+        sessions = memory.get_recent_sessions(20)
+        if not sessions:
+            console.print("  No past sessions found.\n")
+            return
+        from rich.table import Table
+        from rich import box
+        tbl = Table(title="Past Sessions", box=box.SIMPLE_HEAVY, header_style="bold magenta")
+        tbl.add_column("ID",       width=14)
+        tbl.add_column("Target",   width=30)
+        tbl.add_column("Domain",   width=12)
+        tbl.add_column("Findings", justify="right", width=10)
+        import time
+        for s in sessions:
+            ts = time.strftime("%m-%d %H:%M", time.localtime(s["start_time"]))
+            tbl.add_row(s["id"], s["target"][:30], s["domain"], str(s["total_findings"]))
+        console.print(tbl)
+        console.print()
+        return
+
+    # ── export ────────────────────────────────────────────────────────────
+    if args.export:
+        console.print(f"  Export not yet available for session {args.export}.")
+        console.print("  Use Ctrl+E inside an active session to export.\n")
+        return
+
+    # ── AI config ─────────────────────────────────────────────────────────
+    ai_config = build_ai_config_from_args(args.api, args.no_ai)
+    if ai_config is None:
+        # No --api flags given and not --no-ai: run the wizard
+        ai_config = run_startup_wizard()
+
+    # ── Build session ──────────────────────────────────────────────────────
+    target    = args.target or ""
+    session   = Session(
+        target=target,
+        ai_config=ai_config,
     )
-    tool_names = engine.all_tool_names
-    dashboard: TorotDashboard | None = None
 
-    def on_update(tool_name, status, message):
-        if dashboard:
-            dashboard.update_tool(tool_name, status, message)
-        else:
-            icon   = status.icon
-            color  = status.color
-            ts     = time.strftime("%H:%M:%S")
-            console.print(f"  [dim]{ts}[/dim] [{color}]{icon}[/{color}] {tool_name} — {message}")
+    # ── Launch controller + TUI ────────────────────────────────────────────
+    controller = TorotController(session=session, memory=memory)
+    app        = controller.create_app()
 
-    engine.on_status_change = on_update
+    # Run TUI and agent loop concurrently
+    async def agent_task():
+        # Give TUI a moment to mount
+        await asyncio.sleep(0.8)
+        # If a target was given on CLI, inject it immediately
+        if target:
+            controller._queue.put_nowait(target)
+        await controller.run_loop()
 
-    if not no_dashboard:
-        dashboard = TorotDashboard(session=engine.session, tool_names=tool_names)
-        dashboard.start()
+    # Run the Textual app; agent loop runs as a background task
+    async with app.run_async():
+        task = asyncio.create_task(agent_task())
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
-    try:
-        session = await engine.run()
-    except KeyboardInterrupt:
-        if dashboard:
-            dashboard.stop()
-        console.print("\n[yellow]Scan interrupted.[/yellow]")
-        session = engine.session
-    else:
-        if dashboard:
-            dashboard.stop()
-
-    _print_summary(session)
-
-    report_file = generate_report(session, report_path)
-    console.print(f"\n  Report saved: [underline]{report_file}[/underline]\n")
-
-    return session
-
-
-def _print_summary(session):
-    from torot.core.models import Severity, ToolStatus
-
-    total   = session.total_bugs
-    summary = session.bug_summary
-    ran     = session.tools_ran
-    missing = sum(1 for r in session.tool_results.values() if r.status == ToolStatus.NOT_INSTALLED)
-
-    lines = [
-        f"  Scan complete — [bold]{ran}[/bold] tool(s) ran, "
-        f"[dim]{missing}[/dim] not installed, "
-        f"[bold red]{total}[/bold red] finding(s) total",
-        "",
-    ]
-    for sev in Severity:
-        count = summary.get(sev.value, 0)
-        if count:
-            bar = "#" * min(count, 24)
-            lines.append(f"  [{sev.color}]{sev.value:<10}[/{sev.color}]  {bar}  {count}")
-
-    console.print(Panel("\n".join(lines), title="Results", border_style="cyan"))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     args = parse_args()
 
     if args.version:
-        console.print("[bold cyan]Torot[/bold cyan] v1.0.0 — Blockchain & Smart Contract Security Scanner")
+        console.print("[bold cyan]Torot[/bold cyan] v2.0.0 — Universal Security Agent")
         sys.exit(0)
-
-    if args.list_tools:
-        list_tools()
-        sys.exit(0)
-
-    if not args.path:
-        print_banner()
-        console.print("[red]Error:[/red] Provide a path to scan.\n")
-        console.print("  Usage: [bold]torot <path>[/bold]")
-        console.print("         [bold]torot --list-tools[/bold]  to see available tools")
-        sys.exit(1)
-
-    path = os.path.abspath(args.path)
-    if not os.path.exists(path):
-        console.print(f"[red]Error:[/red] Path does not exist: {path}")
-        sys.exit(1)
-
-    api_config = parse_api_config(args.api)
-
-    # Show which APIs are active
-    if args.no_dashboard:
-        print_banner()
-        console.print(f"  Target: [bold]{path}[/bold]")
-        if api_config.has_ai():
-            provider = "Anthropic Claude" if api_config.anthropic_key else "OpenAI GPT-4"
-            console.print(f"  AI enrichment: [green]{provider}[/green]")
-        if api_config.has_etherscan():
-            console.print("  Etherscan verification: [green]enabled[/green]")
-        if api_config.has_github():
-            console.print(f"  GitHub issues: [green]{api_config.github_repo}[/green]")
-        console.print()
 
     try:
-        asyncio.run(run_scan(
-            path=path,
-            report_path=args.report,
-            no_dashboard=args.no_dashboard,
-            concurrent=args.concurrent,
-            api_config=api_config,
-        ))
-    except FileNotFoundError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+        asyncio.run(run(args))
     except KeyboardInterrupt:
-        console.print("\n[yellow]Torot stopped.[/yellow]")
+        console.print("\n  Torot stopped.\n")
         sys.exit(0)
 
 
