@@ -13,10 +13,10 @@
 
 </div>
 
-# Torot v2 — Universal Security Agent
+# Torot v2 - Universal Security Agent
 - An open-source, agent-style CLI security tool that thinks and acts like an elite
 security researcher. It orchestrates 39 industry tools across blockchain, web app,
-binary, and API security — with a live Warp-style split terminal UI, persistent
+binary, and API security - with a live Warp-style split terminal UI, persistent
 memory, and AI reasoning via Claude, GPT-4, or Ollama.
 
 
