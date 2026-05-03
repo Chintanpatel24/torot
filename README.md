@@ -8,7 +8,8 @@
 
 </div>
 
-# Torot - Universal Agent for bug bounty & ...
+# Torot 
+>## Universal Agent for bug bounty & ...
 - An open-source, agent-style CLI security tool that thinks and acts like an elite
 security researcher. It orchestrates 39 industry tools across blockchain, web app,
 binary, and API security - with a live Warp-style split terminal UI, persistent
