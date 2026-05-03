@@ -1,9 +1,10 @@
 <div align=center>
 
+<img width="300" alt="torot" src="https://github.com/user-attachments/assets/3d9d5832-a9eb-4bef-be3a-2d13f2e0a610" />
 
 </div>
 
-# Torot v2 - Universal Security Agent
+# Torot - Universal Security Agent
 - An open-source, agent-style CLI security tool that thinks and acts like an elite
 security researcher. It orchestrates 39 industry tools across blockchain, web app,
 binary, and API security - with a live Warp-style split terminal UI, persistent
