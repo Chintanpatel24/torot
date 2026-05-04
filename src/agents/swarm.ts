@@ -5,3 +5,5 @@
  * - Circuit breaker resilience (shared/resilience/circuit-breaker)
  * - Memory-backed state (agent-memory-coordinator)
  */
+
+export type AgentStatus = "idle" | "running" | "done" | "failed";
