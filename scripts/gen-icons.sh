@@ -23,6 +23,7 @@ mkdir -p "$OUT"
 if command -v convert &>/dev/null; then
   echo "Using ImageMagick..."
 
+  # PNG sizes required by Tauri
   for SIZE in 32 128 256 512; do
     convert "$SOURCE" \
       -resize "${SIZE}x${SIZE}" \
@@ -31,5 +32,6 @@ if command -v convert &>/dev/null; then
     echo "  Created ${SIZE}x${SIZE}.png"
   done
 
+  # @2x variant
   convert "$SOURCE" -resize "256x256" "$OUT/128x128@2x.png"
   echo "  Created 128x128@2x.png"
