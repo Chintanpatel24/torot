@@ -1,6 +1,6 @@
 <div align=center>
 
-<img width="250" alt="torot" src="https://github.com/user-attachments/assets/3d9d5832-a9eb-4bef-be3a-2d13f2e0a610" />
+<img width="250" alt="torot" src="images/torot.png" />
 
 ![Torot](https://img.shields.io/badge/version-2.0.0-amber?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
