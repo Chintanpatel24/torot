@@ -70,3 +70,33 @@ html, body, #root {
   user-select: none;
 }
 
+/* Scrollbars */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* Severity badge */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+}
+.badge-critical { background: rgba(255,59,59,0.15); color: var(--sev-critical); border: 1px solid rgba(255,59,59,0.3); }
+.badge-high     { background: rgba(255,107,53,0.15); color: var(--sev-high);     border: 1px solid rgba(255,107,53,0.3); }
+.badge-medium   { background: rgba(247,185,85,0.12); color: var(--sev-medium);   border: 1px solid rgba(247,185,85,0.25); }
+.badge-low      { background: rgba(79,195,247,0.10); color: var(--sev-low);      border: 1px solid rgba(79,195,247,0.2); }
+.badge-info     { background: rgba(144,164,174,0.10); color: var(--sev-info);    border: 1px solid rgba(144,164,174,0.2); }
+
+/* Mono text */
+.mono { font-family: var(--font-mono); }
+
+/* Transitions */
+.transition { transition: all 0.15s ease; }
+
+/* Focus ring */
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
