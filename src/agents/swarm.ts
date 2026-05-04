@@ -34,3 +34,6 @@ export interface SwarmState {
   memory:  Map<string, unknown>;
   running: boolean;
 }
+
+// ─── Circuit Breaker (from ruflo resilience patterns) ─────────────────────────
+
