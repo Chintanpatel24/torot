@@ -245,3 +245,43 @@ export class QueenCoordinator {
 
 // ─── Plan builder from ruflo agent-goal-planner patterns ─────────────────────
 
+export function buildScanTasks(
+  tools:    string[],
+  target:   string,
+  domain:   string,
+): Omit<AgentTask, "status" | "output">[] {
+  const tasks: Omit<AgentTask, "status" | "output">[] = [];
+
+  // Recon phase (priority 10)
+  if (tools.includes("semgrep")) {
+    tasks.push({ id: "recon-semgrep", name: "Pattern Analysis", tool: "semgrep", priority: 10, dependsOn: [] });
+  }
+  if (tools.includes("strings")) {
+    tasks.push({ id: "recon-strings", name: "String Extraction", tool: "strings", priority: 9, dependsOn: [] });
+  }
+
+  // Static analysis (priority 8, can run in parallel)
+  const staticTools = ["slither", "aderyn", "mythril", "solhint", "wake", "solc", "clippy", "cargo-audit"];
+  staticTools.filter((t) => tools.includes(t)).forEach((tool, i) => {
+    tasks.push({ id: `static-${tool}`, name: `Static: ${tool}`, tool, priority: 8 - i, dependsOn: [] });
+  });
+
+  // Dynamic / fuzzing (priority 6, after static)
+  const dynamicTools = ["echidna", "manticore", "halmos", "nuclei", "nikto", "ffuf", "gobuster", "sqlmap", "dalfox"];
+  const staticIds = tasks.filter((t) => t.id.startsWith("static")).map((t) => t.id);
+  dynamicTools.filter((t) => tools.includes(t)).forEach((tool, i) => {
+    tasks.push({ id: `dynamic-${tool}`, name: `Dynamic: ${tool}`, tool, priority: 6 - i, dependsOn: [] });
+  });
+
+  // Secret/leak scanning (priority 5)
+  ["trufflehog", "gitleaks"].filter((t) => tools.includes(t)).forEach((tool) => {
+    tasks.push({ id: `leak-${tool}`, name: `Leak scan: ${tool}`, tool, priority: 5, dependsOn: [] });
+  });
+
+  // Binary analysis (priority 4)
+  ["radare2", "binwalk", "checksec", "objdump"].filter((t) => tools.includes(t)).forEach((tool, i) => {
+    tasks.push({ id: `binary-${tool}`, name: `Binary: ${tool}`, tool, priority: 4 - i, dependsOn: [] });
+  });
+
+  return tasks;
+}
