@@ -68,3 +68,13 @@ if command -v convert &>/dev/null; then
     \( -clone 0 -resize 256x256 \) \
     -delete 0 "$OUT/icon.ico"
   echo "  Created icon.ico"
+
+elif command -v vips &>/dev/null; then
+  echo "Using libvips..."
+  for SIZE in 32 128 256 512; do
+    vips thumbnail "$SOURCE" "$OUT/${SIZE}x${SIZE}.png" "$SIZE" &>/dev/null
+    echo "  Created ${SIZE}x${SIZE}.png"
+  done
+  cp "$OUT/256x256.png" "$OUT/128x128@2x.png"
+  cp "$OUT/256x256.png" "$OUT/icon.icns"
+  cp "$OUT/256x256.png" "$OUT/icon.ico"
