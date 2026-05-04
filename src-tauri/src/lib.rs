@@ -327,4 +327,248 @@ async fn start_scan(
     }
 
     // Save to DB
+   {
+        let db = state.db.lock().unwrap();
+        db.execute(
+            "INSERT OR REPLACE INTO sessions (id, target, domain, start_time, end_time, total_findings, summary)
+             VALUES (?1, ?2, ?3, ?4, 0, 0, '')",
+            params![&session_id, &target, "auto", session.start_time],
+        ).ok();
+    }
+
+    emit_line(&app, &session_id, "system", "torot", &format!("Session {} started", &session_id), None);
+    emit_line(&app, &session_id, "system", "torot", &format!("Target: {}", &target), None);
+    emit_line(&app, &session_id, "system", "torot", &format!("Mode: {}", &mode), None);
+    emit_line(&app, &session_id, "system", "torot", &format!("Tools selected: {}", tools.join(", ")), None);
+
+    let state_clone = Arc::clone(&state);
+    let app_clone   = app.clone();
+    let sid         = session_id.clone();
+    let tgt         = target.clone();
+
+    tokio::spawn(async move {
+        run_scan_pipeline(sid, tgt, tools, app_clone, state_clone).await;
+    });
+
+    Ok(session_id)
+}
+
+async fn run_scan_pipeline(
+    session_id: String,
+    target:     String,
+    tools:      Vec<String>,
+    app:        AppHandle,
+    state:      Arc<AppState>,
+) {
+    emit_line(&app, &session_id, "system", "torot", "Starting parallel tool execution...", None);
+
+    let mut handles = Vec::new();
+
+    for tool_name in &tools {
+        let tool_def = ALL_TOOLS.iter().find(|t| t.name == tool_name);
+        if tool_def.is_none() { continue; }
+        let td = tool_def.unwrap().clone();
+        let binary = match find_binary(td.binaries) {
+            Some(b) => b,
+            None => {
+                emit_line(&app, &session_id, "system", &td.name, &format!("{} not installed — skipping", td.name), None);
+                continue;
+            }
+        };
+
+        let sid2    = session_id.clone();
+        let tgt2    = target.clone();
+        let app2    = app.clone();
+        let state2  = Arc::clone(&state);
+        let tname   = td.name.to_string();
+
+        let handle = tokio::spawn(async move {
+            run_single_tool(&sid2, &tgt2, &tname, &binary, app2, state2).await
+        });
+        handles.push(handle);
+    }
+
+    for h in handles {
+        let _ = h.await;
+    }
+
+    // Finalize session
+    let ts = now_unix();
+    {
+        let db = state.db.lock().unwrap();
+        let sessions = state.sessions.lock().unwrap();
+        if let Some(sess) = sessions.get(&session_id) {
+            let count = sess.findings.len() as u32;
+            let summary = serde_json::to_string(&sess.findings.iter().fold(
+                HashMap::<String,u32>::new(),
+                |mut m, f| { *m.entry(f.severity.clone()).or_insert(0) += 1; m }
+            )).unwrap_or_default();
+            db.execute(
+                "UPDATE sessions SET end_time=?1, total_findings=?2, summary=?3 WHERE id=?4",
+                params![ts, count, summary, &session_id],
+            ).ok();
+        }
+    }
+
+    let total = {
+        let sessions = state.sessions.lock().unwrap();
+        sessions.get(&session_id).map(|s| s.findings.len()).unwrap_or(0)
+    };
+
+    emit_line(&app, &session_id, "system", "torot",
+        &format!("Scan complete. {} findings total.", total), None);
+    app.emit("scan_complete", serde_json::json!({ "session_id": session_id, "total": total })).ok();
+}
+
+async fn run_single_tool(
+    session_id: &str,
+    target:     &str,
+    tool_name:  &str,
+    binary:     &str,
+    app:        AppHandle,
+    state:      Arc<AppState>,
+) {
+    emit_line(&app, session_id, "system", tool_name, &format!("[{}] Starting...", tool_name), None);
+
+    let args = build_args(tool_name, binary, target);
+    if args.is_empty() {
+        emit_line(&app, session_id, "system", tool_name,
+            &format!("[{}] No applicable target found", tool_name), None);
+        return;
+    }
+
+    let cwd = if std::path::Path::new(target).is_dir() { target } else { "." };
+
+    let mut child = match Command::new(binary)
+        .args(&args)
+        .current_dir(cwd)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(c)  => c,
+        Err(e) => {
+            emit_line(&app, session_id, "system", tool_name,
+                &format!("[{}] Failed to start: {}", tool_name, e), None);
+            return;
+        }
+    };
+
+    let stdout = child.stdout.take().map(BufReader::new);
+    let stderr = child.stderr.take().map(BufReader::new);
+
+    let mut all_output = Vec::<String>::new();
+
+    if let Some(mut reader) = stdout {
+        let mut lines = reader.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            emit_line(&app, session_id, "output", tool_name, &line, None);
+            all_output.push(line);
+        }
+    }
+    if let Some(mut reader) = stderr {
+        let mut lines = reader.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            if !line.is_empty() {
+                emit_line(&app, session_id, "output", tool_name, &line, None);
+                all_output.push(line);
+            }
+        }
+    }
+
+    let _ = child.wait().await;
+
+    let combined = all_output.join("\n");
+    let findings = parse_output(session_id, tool_name, &combined);
+
+    for f in &findings {
+        emit_line(&app, session_id, "finding", tool_name, &f.title,
+            Some(f.severity.clone()));
+        // save to DB
+        let db = state.db.lock().unwrap();
+        db.execute(
+            "INSERT OR IGNORE INTO findings (id, session_id, tool, title, severity, domain, description, file, line, code_snippet, fix_suggestion, impact, bug_type, timestamp)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+            params![
+                &f.id, &f.session_id, &f.tool, &f.title, &f.severity,
+                &f.domain, &f.description, &f.file, f.line,
+                &f.code_snippet, &f.fix_suggestion, &f.impact,
+                &f.bug_type, f.timestamp
+            ],
+        ).ok();
+        drop(db);
+
+        let mut sessions = state.sessions.lock().unwrap();
+        if let Some(sess) = sessions.get_mut(session_id) {
+            sess.findings.push(f.clone());
+        }
+
+        app.emit("new_finding", f).ok();
+    }
+
+    emit_line(&app, session_id, "system", tool_name,
+        &format!("[{}] Done. {} findings.", tool_name, findings.len()), None);
+}
+
+fn build_args(tool: &str, binary: &str, target: &str) -> Vec<String> {
+    use std::path::Path;
+    let is_dir = Path::new(target).is_dir();
+
+    let sol_glob = if is_dir {
+        glob::glob(&format!("{}/**/*.sol", target))
+            .ok().and_then(|mut g| g.next())
+            .and_then(|p| p.ok())
+            .map(|p| p.to_string_lossy().to_string())
+    } else { None };
+
+    match tool {
+        "slither"     => vec![target.to_string(), "--json".to_string(), "-".to_string(), "--no-fail-pedantic".to_string()],
+        "aderyn"      => vec![target.to_string(), "--output".to_string(), "json".to_string()],
+        "mythril"     => sol_glob.map(|s| vec!["analyze".to_string(), s, "-o".to_string(), "json".to_string(), "--execution-timeout".to_string(), "60".to_string()]).unwrap_or_default(),
+        "echidna"     => sol_glob.map(|s| vec![s, "--format".to_string(), "text".to_string(), "--test-limit".to_string(), "1000".to_string()]).unwrap_or_default(),
+        "semgrep"     => vec!["--config".to_string(), "auto".to_string(), "--json".to_string(), target.to_string(), "--quiet".to_string()],
+        "solhint"     => vec![format!("{}/**/*.sol", target), "--formatter".to_string(), "json".to_string()],
+        "nuclei"      => vec!["-target".to_string(), target.to_string(), "-json".to_string(), "-silent".to_string()],
+        "nikto"       => vec!["-h".to_string(), target.to_string(), "-Format".to_string(), "txt".to_string()],
+        "sqlmap"      => vec!["-u".to_string(), target.to_string(), "--batch".to_string(), "--level=2".to_string()],
+        "ffuf"        => vec!["-u".to_string(), format!("{}/FUZZ", target), "-w".to_string(), "/usr/share/wordlists/common.txt".to_string(), "-o".to_string(), "json".to_string()],
+        "gobuster"    => vec!["dir".to_string(), "-u".to_string(), target.to_string(), "-w".to_string(), "/usr/share/wordlists/dirb/common.txt".to_string()],
+        "dalfox"      => vec!["url".to_string(), target.to_string(), "--silence".to_string()],
+        "trufflehog"  => vec!["filesystem".to_string(), target.to_string(), "--json".to_string()],
+        "gitleaks"    => vec!["detect".to_string(), "--source".to_string(), target.to_string(), "--report-format".to_string(), "json".to_string()],
+        "checksec"    => vec!["--file".to_string(), target.to_string(), "--output".to_string(), "json".to_string()],
+        "strings"     => vec![target.to_string()],
+        "cargo-audit" => vec!["audit".to_string(), "--json".to_string()],
+        "clippy"      => vec!["clippy".to_string(), "--message-format=json".to_string(), "--".to_string(), "-D".to_string(), "warnings".to_string()],
+        _ => vec![target.to_string()],
+    }
+}
+
+fn parse_output(session_id: &str, tool: &str, output: &str) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    let keywords = ["error", "warning", "vulnerability", "critical", "high risk",
+                    "medium risk", "low risk", "reentrancy", "overflow", "injection",
+                    "xss", "sqli", "rce", "lfi", "ssrf", "idor", "failed", "violation"];
+
+    for line in output.lines() {
+        let lw = line.to_lowercase();
+        if keywords.iter().any(|k| lw.contains(k)) && line.len() > 10 {
+            let sev = if lw.contains("critical") || lw.contains("high risk") { "CRITICAL" }
+                      else if lw.contains("high") || lw.contains("error") { "HIGH" }
+                      else if lw.contains("medium") || lw.contains("warning") { "MEDIUM" }
+                      else if lw.contains("low") { "LOW" }
+                      else { "INFO" };
+
+            let mut f = Finding::new(session_id, tool, &format!("[{}] {}", tool, &line[..line.len().min(80)]), sev);
+            f.description = line.trim().to_string();
+            f.domain = match tool {
+                "slither"|"aderyn"|"mythril"|"echidna"|"halmos"|"solhint"|"wake" => "blockchain",
+                "nuclei"|"nikto"|"sqlmap"|"ffuf"|"gobuster"|"dalfox" => "webapp",
+                "radare2"|"binwalk"|"checksec"|"strings"|"objdump" => "binary",
+                "arjun"|"jwt_tool" => "api",
+                _ => "general",
+            }.to_string();
+            findings.push(f);
+        }
+    }
 
