@@ -17,3 +17,19 @@ if [[ ! -f "$SOURCE" ]]; then
   echo "Usage: $0 <path-to-logo.png>"
   exit 1
 fi
+
+mkdir -p "$OUT"
+
+if command -v convert &>/dev/null; then
+  echo "Using ImageMagick..."
+
+  for SIZE in 32 128 256 512; do
+    convert "$SOURCE" \
+      -resize "${SIZE}x${SIZE}" \
+      -background none \
+      "$OUT/${SIZE}x${SIZE}.png"
+    echo "  Created ${SIZE}x${SIZE}.png"
+  done
+
+  convert "$SOURCE" -resize "256x256" "$OUT/128x128@2x.png"
+  echo "  Created 128x128@2x.png"
