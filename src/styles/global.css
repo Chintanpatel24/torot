@@ -3,3 +3,22 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Core palette */
+  --bg-base:        #0d0f14;
+  --bg-surface:     #13161e;
+  --bg-elevated:    #1a1e28;
+  --bg-overlay:     #212637;
+  --bg-input:       #161a24;
+
+  /* Borders */
+  --border-subtle:  #232837;
+  --border-default: #2d3448;
+  --border-strong:  #3d4560;
+
+  /* Text */
+  --text-primary:   #e8eaf0;
+  --text-secondary: #9ba3bf;
+  --text-muted:     #5c6580;
+  --text-inverse:   #0d0f14;
