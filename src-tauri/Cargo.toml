@@ -1,0 +1,8 @@
+[package]
+name    = "torot"
+version = "3.0.0"
+description = "Torot — Universal Security Agent"
+authors = ["Torot Contributors"]
+license = "MIT"
+repository = ""
+edition = "2021"
