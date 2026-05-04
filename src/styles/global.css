@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Torot Design System — Warp-inspired terminal aesthetic
+   Torot Design System —> Warp-inspired terminal aesthetic
    ───────────────────────────────────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -57,5 +57,16 @@
   --font-size-sm:   12px;
   --font-size-md:   13px;
   --font-size-lg:   14px;
+}
+
+html, body, #root {
+  width: 100%; height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-md);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
 }
 
