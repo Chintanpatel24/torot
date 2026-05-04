@@ -56,3 +56,15 @@ if command -v convert &>/dev/null; then
     cp "$OUT/256x256.png" "$OUT/icon.icns"
     echo "  icon.icns: copied PNG as placeholder (install png2icns for proper .icns)"
   fi
+
+ # .ico for Windows (multi-size)
+  convert "$SOURCE" \
+    \( -clone 0 -resize 16x16  \) \
+    \( -clone 0 -resize 24x24  \) \
+    \( -clone 0 -resize 32x32  \) \
+    \( -clone 0 -resize 48x48  \) \
+    \( -clone 0 -resize 64x64  \) \
+    \( -clone 0 -resize 128x128 \) \
+    \( -clone 0 -resize 256x256 \) \
+    -delete 0 "$OUT/icon.ico"
+  echo "  Created icon.ico"
