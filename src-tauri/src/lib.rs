@@ -572,3 +572,170 @@ fn parse_output(session_id: &str, tool: &str, output: &str) -> Vec<Finding> {
         }
     }
 
+   // JSON parsing for tools that output JSON
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(output) {
+        findings.extend(parse_json_output(session_id, tool, &json));
+    } else {
+        // Try line-by-line JSON (ndjson)
+        for line in output.lines() {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                findings.extend(parse_json_output(session_id, tool, &json));
+            }
+        }
+    }
+
+    findings.sort_by(|a, b| {
+        let order = |s: &str| match s { "CRITICAL"=>0,"HIGH"=>1,"MEDIUM"=>2,"LOW"=>3,_=>4 };
+        order(&a.severity).cmp(&order(&b.severity))
+    });
+    findings.dedup_by(|a, b| a.description == b.description);
+    findings
+}
+
+fn parse_json_output(session_id: &str, tool: &str, json: &serde_json::Value) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    match tool {
+        "slither" => {
+            if let Some(detectors) = json.pointer("/results/detectors").and_then(|v| v.as_array()) {
+                for det in detectors {
+                    let check = det["check"].as_str().unwrap_or("issue");
+                    let impact = det["impact"].as_str().unwrap_or("Low");
+                    let sev = match impact { "High" => "HIGH", "Medium" => "MEDIUM", "Low" => "LOW", _ => "INFO" };
+                    let desc = det["description"].as_str().unwrap_or("").to_string();
+                    let mut f = Finding::new(session_id, tool, &format!("[slither] {}", check.replace('-',' ')), sev);
+                    f.description = desc;
+                    f.domain = "blockchain".to_string();
+                    f.bug_type = check.to_string();
+                    findings.push(f);
+                }
+            }
+        }
+        "mythril" => {
+            if let Some(issues) = json["issues"].as_array() {
+                for issue in issues {
+                    let title = issue["title"].as_str().unwrap_or("issue");
+                    let sev = match issue["severity"].as_str().unwrap_or("Low") {
+                        "High" => "HIGH", "Medium" => "MEDIUM", _ => "LOW"
+                    };
+                    let mut f = Finding::new(session_id, tool, &format!("[mythril] {}", title), sev);
+                    f.description = issue["description"].as_str().unwrap_or("").to_string();
+                    f.file = issue["filename"].as_str().unwrap_or("").to_string();
+                    f.line = issue["lineno"].as_u64().unwrap_or(0) as u32;
+                    f.domain = "blockchain".to_string();
+                    findings.push(f);
+                }
+            }
+        }
+        "semgrep" => {
+            if let Some(results) = json["results"].as_array() {
+                for r in results {
+                    let check_id = r["check_id"].as_str().unwrap_or("rule");
+                    let sev_raw  = r["extra"]["severity"].as_str().unwrap_or("WARNING");
+                    let sev = match sev_raw { "ERROR" => "HIGH", "WARNING" => "MEDIUM", _ => "LOW" };
+                    let msg = r["extra"]["message"].as_str().unwrap_or("").to_string();
+                    let mut f = Finding::new(session_id, tool, &format!("[semgrep] {}", check_id.split('.').last().unwrap_or(check_id)), sev);
+                    f.description = msg;
+                    f.file = r["path"].as_str().unwrap_or("").to_string();
+                    f.line = r["start"]["line"].as_u64().unwrap_or(0) as u32;
+                    findings.push(f);
+                }
+            }
+        }
+        "nuclei" => {
+            let sev_raw = json["info"]["severity"].as_str().unwrap_or("info");
+            let sev = match sev_raw { "critical" => "CRITICAL", "high" => "HIGH", "medium" => "MEDIUM", "low" => "LOW", _ => "INFO" };
+            let name = json["info"]["name"].as_str().unwrap_or("nuclei finding");
+            let mut f = Finding::new(session_id, tool, &format!("[nuclei] {}", name), sev);
+            f.description = json["info"]["description"].as_str().unwrap_or("").to_string();
+            f.file = json["matched-at"].as_str().unwrap_or("").to_string();
+            f.domain = "webapp".to_string();
+            if f.title.len() > 10 { findings.push(f); }
+        }
+        _ => {}
+    }
+    findings
+}
+
+fn emit_line(app: &AppHandle, session_id: &str, kind: &str, tool: &str, line: &str, severity: Option<String>) {
+    app.emit("stream_line", StreamLine {
+        session_id: session_id.to_string(),
+        tool:       tool.to_string(),
+        line:       line.to_string(),
+        kind:       kind.to_string(),
+        severity,
+    }).ok();
+}
+
+#[tauri::command]
+async fn get_sessions(state: State<'_, Arc<AppState>>) -> Result<Vec<DbSession>, String> {
+    let db = state.db.lock().unwrap();
+    let mut stmt = db.prepare(
+        "SELECT id, target, domain, start_time, end_time, total_findings, summary FROM sessions ORDER BY start_time DESC LIMIT 50"
+    ).map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok(DbSession {
+            id:             row.get(0)?,
+            target:         row.get(1)?,
+            domain:         row.get(2)?,
+            start_time:     row.get(3)?,
+            end_time:       row.get(4)?,
+            total_findings: row.get(5)?,
+            summary:        row.get(6)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+#[tauri::command]
+async fn get_findings(session_id: String, state: State<'_, Arc<AppState>>) -> Result<Vec<Finding>, String> {
+    let db = state.db.lock().unwrap();
+    let mut stmt = db.prepare(
+        "SELECT id, session_id, tool, title, severity, domain, description, file, line, code_snippet, fix_suggestion, impact, bug_type, timestamp
+         FROM findings WHERE session_id=?1 ORDER BY CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END"
+    ).map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map([&session_id], |row| {
+        Ok(Finding {
+            id:             row.get(0)?,
+            session_id:     row.get(1)?,
+            tool:           row.get(2)?,
+            title:          row.get(3)?,
+            severity:       row.get(4)?,
+            domain:         row.get(5)?,
+            description:    row.get(6)?,
+            file:           row.get(7)?,
+            line:           row.get(8)?,
+            code_snippet:   row.get(9)?,
+            fix_suggestion: row.get(10)?,
+            impact:         row.get(11)?,
+            bug_type:       row.get(12)?,
+            timestamp:      row.get(13)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+#[tauri::command]
+async fn stop_scan(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    let mut active = state.active_scan.lock().unwrap();
+    *active = None;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_db_stats(state: State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
+    let db = state.db.lock().unwrap();
+    let sessions: i64 = db.query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0)).unwrap_or(0);
+    let findings: i64 = db.query_row("SELECT COUNT(*) FROM findings",  [], |r| r.get(0)).unwrap_or(0);
+    let critical: i64 = db.query_row("SELECT COUNT(*) FROM findings WHERE severity='CRITICAL'", [], |r| r.get(0)).unwrap_or(0);
+    let high:     i64 = db.query_row("SELECT COUNT(*) FROM findings WHERE severity='HIGH'",     [], |r| r.get(0)).unwrap_or(0);
+    Ok(serde_json::json!({ "sessions": sessions, "findings": findings, "critical": critical, "high": high }))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App Entry
+// ─────────────────────────────────────────────────────────────────────────────
+
