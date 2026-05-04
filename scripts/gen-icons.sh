@@ -95,4 +95,5 @@ else
 fi
 
 echo ""
-
+echo "Icons written to $OUT/"
+ls -la "$OUT/"
