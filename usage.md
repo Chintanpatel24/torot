@@ -44,40 +44,6 @@ torot --api etherscan=ABC123 --api github=ghp_TOKEN --api github-repo=owner/repo
 
 ---
 
-## UI — Warp-Style Split Terminal
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│ TOROT  target: ./contracts/  C:2 H:5 M:8 L:3  total:18  ai:claude  │
-├────────────────────────────────────────────────────────────────────┤
-│ Live Output                                                        │
-│                                                                    │
-│  12:34:01  > Starting: slither                                     │
-│  12:34:01  [slither] Reentrancy detected in Vault.sol:42           │
-│  12:34:05  > Starting: mythril                                     │
-│  12:34:06  [mythril] Integer overflow in Token.sol:67              │
-│  12:34:10  [CRITICAL] [slither] Reentrancy-eth  Vault.sol:42       │
-│  12:34:10  [HIGH]     [mythril] Integer Overflow Token.sol:67      │
-│  12:34:15  > Finished: slither (14.2s)                             │
-│  ...                                                               │
-│                                                                    │
-├────────────────────────────────────────────────────────────────────┤
-│ Agent Plan                                                         │
-│   1. [+] Detect languages     (internal)                           │
-│   2. [*] Static analysis      (all)          <- running            │
-│   3. [o] AI review            (ai-analysis)  <- pending            │
-│   4. [o] Generate report      (internal)                           │
-├────────────────────────────────────────────────────────────────────┤
-│ Conversation                                                       │
-│  you   ./contracts/                                                │
-│  torot Building attack plan for ./contracts/...                    │
-├────────────────────────────────────────────────────────────────────┤
-│  Step: Static analysis  |  Tool: all  |  Approve? [Approve] [Skip] │
-├────────────────────────────────────────────────────────────────────┤
-│ > Ask Torot anything, or type a target path...                     │
-└────────────────────────────────────────────────────────────────────┘
-```
-
 **Keyboard shortcuts:**
 - `Ctrl+C` - quit
 - `Ctrl+L` - clear log
@@ -147,19 +113,156 @@ That's it — the tool auto-appears in `--list-tools`, the wizard, and all scan 
 
 ```
 torot/
-  cli.py                    Entry point (argparse + asyncio)
-  core/
-    models.py               All data types (Session, Finding, AIConfig, ...)
-    report.py               Markdown report generator
-  ui/
-    app.py                  Textual TUI (Warp-style split layout)
-    wizard.py               Startup wizard (AI provider picker)
-  agents/
-    brain.py                AI reasoning (Claude / OpenAI / Ollama)
-    controller.py           Main agent loop (drives everything)
-    orchestrator.py         Tool runner + output parser
-  tools/
-    registry.py             39 tool definitions + generic runner
-  memory/
-    store.py                SQLite persistence + export
+  src/                          React frontend (TypeScript)
+    agents/
+      swarm.ts                  Swarm agent orchestration engine
+                                  - QueenCoordinator (hierarchical)
+                                  - CircuitBreaker (resilience)
+                                  - Task dependency graph (waves)
+    rules/
+      engine.ts                 Security rules engine (Lua-inspired DSL)
+                                  - 16 built-in rules across all domains
+                                  - Pattern matching + negation
+                                  - Custom rule loading (JSON)
+    lib/
+      store.ts                  Zustand global state
+      api.ts                    Tauri IPC bridge
+    components/                 UI components
+      Titlebar.tsx              Custom titlebar with inline SVG logo
+      Sidebar.tsx               Navigation sidebar
+      HomeView.tsx              Target + tool selector launch pad
+      ScanView.tsx              Live split terminal view
+      FindingsView.tsx          Findings browser + detail panel
+      HistoryView.tsx           Past sessions (SQLite-backed)
+      ToolsView.tsx             Tool management + install hints
+      SettingsView.tsx          API key storage
+  src-tauri/                    Rust backend (Tauri)
+    src/
+      main.rs                   App entry point
+      lib.rs                    Full backend:
+                                  - 28 tool definitions
+                                  - Async parallel tool execution
+                                  - Real-time stdout/stderr streaming
+                                  - JSON + line-by-line output parsing
+                                  - SQLite memory (sessions + findings + knowledge)
+                                  - Tauri IPC commands
+    tauri.conf.json             App config, window settings, plugin config
+    Cargo.toml                  Rust dependencies
+    icons/                      All platform icons (auto-generated)
+  assets/
+    torot-logo.png              Source logo
+  scripts/
+    gen-icons.sh                Icon generation script (ImageMagick)
+  install.sh                    One-liner universal installer
+  update.sh                     Updater (Torot + all tools)
 ```
+
+---
+
+## Building
+
+### Prerequisites
+- Rust 1.77+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Node.js 18+ (`https://nodejs.org`)
+- System deps (Linux): `sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev`
+
+### Development
+```bash
+npm install
+npm run tauri:dev
+```
+
+### Production build
+```bash
+npm run tauri:build
+# Output: src-tauri/target/release/bundle/
+```
+
+### Icon generation (requires ImageMagick)
+```bash
+chmod +x scripts/gen-icons.sh
+./scripts/gen-icons.sh assets/torot-logo.png
+```
+
+---
+
+## Supported tools — 28 total
+
+### Blockchain (13)
+`slither` `aderyn` `mythril` `echidna` `manticore` `solhint` `halmos`
+`semgrep` `solc` `wake` `heimdall` `cargo-audit` `clippy`
+
+### Web App (7)
+`nuclei` `nikto` `sqlmap` `ffuf` `gobuster` `dalfox` `trufflehog` `gitleaks`
+
+### API (2)
+`arjun` `jwt_tool`
+
+### Binary (6)
+`radare2` `binwalk` `checksec` `strings` `objdump` `ltrace`
+
+---
+
+## Built-in rules engine
+
+16 pre-loaded security rules covering:
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| SOL-001 | CRITICAL | Reentrancy |
+| SOL-002 | HIGH | tx.origin authentication |
+| SOL-003 | HIGH | Integer overflow |
+| SOL-004 | CRITICAL | Unprotected selfdestruct |
+| SOL-005 | MEDIUM | Timestamp dependence |
+| SOL-006 | HIGH | Flash loan attack surface |
+| SOL-007 | HIGH | Missing access control |
+| WEB-001 | CRITICAL | SQL injection |
+| WEB-002 | HIGH | XSS |
+| WEB-003 | HIGH | SSRF |
+| WEB-004 | CRITICAL | Hardcoded credentials |
+| BIN-001 | CRITICAL | Stack buffer overflow |
+| BIN-002 | MEDIUM | Missing binary hardening |
+| API-001 | HIGH | IDOR/BOLA |
+| API-002 | HIGH | JWT vulnerability |
+
+Custom rules can be loaded as JSON at runtime.
+
+---
+
+## Swarm agent architecture
+
+The TypeScript swarm engine (`src/agents/swarm.ts`) implements:
+
+- **QueenCoordinator** — hierarchical task orchestration
+- **CircuitBreaker** — per-tool failure isolation (3 strikes → open 30s)
+- **Dependency waves** — tasks run in phases respecting `dependsOn` chains
+- **Priority scheduling** — recon (10) → static (8) → dynamic (6) → binary (4)
+- **Memory store** — key-value store for inter-task communication
+- **Parallel execution** — configurable `maxParallel` with semaphore
+
+---
+
+## Update
+
+```bash
+./update.sh                # update everything
+./update.sh --torot-only   # only update Torot
+./update.sh --tools-only   # only update security tools
+./update.sh --check        # check versions, no changes
+```
+
+---
+
+## Run modes
+
+| Mode | Behaviour |
+|------|-----------|
+| Single | Scan once, display results |
+| Loop | Repeat scan until stopped (useful for CI/watch) |
+| Daemon | Watch a folder for file changes, rescan automatically |
+
+---
+
+## License
+
+MIT
