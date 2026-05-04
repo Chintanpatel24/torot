@@ -739,3 +739,25 @@ async fn get_db_stats(state: State<'_, Arc<AppState>>) -> Result<serde_json::Val
 // App Entry
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let state = Arc::new(AppState::new().expect("Failed to initialize app state"));
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .manage(state)
+        .invoke_handler(tauri::generate_handler![
+            get_tools,
+            start_scan,
+            stop_scan,
+            get_sessions,
+            get_findings,
+            get_db_stats,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running Torot");
+}
