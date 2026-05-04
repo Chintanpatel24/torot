@@ -78,3 +78,18 @@ elif command -v vips &>/dev/null; then
   cp "$OUT/256x256.png" "$OUT/128x128@2x.png"
   cp "$OUT/256x256.png" "$OUT/icon.icns"
   cp "$OUT/256x256.png" "$OUT/icon.ico"
+
+else
+  echo "No image tool found. Install ImageMagick:"
+  echo "  macOS: brew install imagemagick"
+  echo "  Linux: sudo apt install imagemagick"
+  echo ""
+  echo "Creating placeholder icons from source PNG..."
+  for SIZE in 32 128 256 512; do
+    cp "$SOURCE" "$OUT/${SIZE}x${SIZE}.png"
+  done
+  cp "$SOURCE" "$OUT/128x128@2x.png"
+  cp "$SOURCE" "$OUT/icon.icns"
+  cp "$SOURCE" "$OUT/icon.ico"
+  echo "Placeholder icons copied. Run this script again with ImageMagick installed for proper sizes."
+fi
