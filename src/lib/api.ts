@@ -30,3 +30,14 @@ export const api = {
 // Event listeners
 // ─────────────────────────────────────────────────────────────────────────────
 
+export function onStreamLine(cb: (line: StreamLine) => void): Promise<UnlistenFn> {
+  return listen<StreamLine>("stream_line", (e) => cb(e.payload));
+}
+
+export function onNewFinding(cb: (f: Finding) => void): Promise<UnlistenFn> {
+  return listen<Finding>("new_finding", (e) => cb(e.payload));
+}
+
+export function onScanComplete(cb: (data: { session_id: string; total: number }) => void): Promise<UnlistenFn> {
+  return listen<{ session_id: string; total: number }>("scan_complete", (e) => cb(e.payload));
+}
