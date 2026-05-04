@@ -93,3 +93,6 @@ else
   cp "$SOURCE" "$OUT/icon.ico"
   echo "Placeholder icons copied. Run this script again with ImageMagick installed for proper sizes."
 fi
+
+echo ""
+
