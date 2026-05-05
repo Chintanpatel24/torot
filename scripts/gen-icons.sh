@@ -36,7 +36,7 @@ if command -v convert &>/dev/null; then
   convert "$SOURCE" -resize "256x256" "$OUT/128x128@2x.png"
   echo "  Created 128x128@2x.png"
 
- # .icns for macOS — requires png2icns or sips
+  # .icns for macOS — requires png2icns or sips
   if command -v png2icns &>/dev/null; then
     png2icns "$OUT/icon.icns" "$OUT/512x512.png" "$OUT/256x256.png" \
       "$OUT/128x128.png" "$OUT/32x32.png"
@@ -57,7 +57,7 @@ if command -v convert &>/dev/null; then
     echo "  icon.icns: copied PNG as placeholder (install png2icns for proper .icns)"
   fi
 
- # .ico for Windows (multi-size)
+  # .ico for Windows (multi-size)
   convert "$SOURCE" \
     \( -clone 0 -resize 16x16  \) \
     \( -clone 0 -resize 24x24  \) \
