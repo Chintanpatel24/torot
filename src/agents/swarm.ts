@@ -1,5 +1,6 @@
 /**
  * Torot Swarm Agent Engine
+ * Inspired by ruflo/claude-flow agent coordination patterns:
  * - Task decomposition (agent-orchestrator-task)
  * - Hierarchical coordination (agent-hierarchical-coordinator)
  * - Circuit breaker resilience (shared/resilience/circuit-breaker)
@@ -123,8 +124,7 @@ export class QueenCoordinator {
   }
 
   // Build execution plan — respects dependencies (from agent-orchestrator-task)
-
- buildExecutionPlan(): AgentTask[][] {
+  buildExecutionPlan(): AgentTask[][] {
     const tasks   = Array.from(this.swarm.tasks.values());
     const waves: AgentTask[][] = [];
     const done    = new Set<string>();
