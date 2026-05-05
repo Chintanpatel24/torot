@@ -1,14 +1,13 @@
 [package]
-name    = "torot"
-version = "3.0.0"
+name        = "torot"
+version     = "3.0.0"
 description = "Torot — Universal Security Agent"
-authors = ["Torot Contributors"]
-license = "MIT"
-repository = ""
-edition = "2021"
+authors     = ["Torot Contributors"]
+license     = "MIT"
+edition     = "2021"
 
 [lib]
-name = "torot_lib"
+name       = "torot_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
@@ -19,23 +18,20 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri               = { version = "2", features = ["macos-private-api"] }
-tauri-plugin-fs     = "2"
-tauri-plugin-shell  = "2"
-tauri-plugin-dialog = "2"
+tauri                     = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-fs           = "2"
+tauri-plugin-shell        = "2"
+tauri-plugin-dialog       = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-store  = "2"
-serde               = { version = "1", features = ["derive"] }
-serde_json          = "1"
-tokio               = { version = "1", features = ["full"] }
-anyhow              = "1"
-uuid                = { version = "1", features = ["v4"] }
-chrono              = { version = "0.4", features = ["serde"] }
-rusqlite            = { version = "0.31", features = ["bundled"] }
-which               = "6"
-regex               = "1"
-log                 = "0.4"
-env_logger          = "0.11"
+tauri-plugin-store        = "2"
+serde                     = { version = "1", features = ["derive"] }
+serde_json                = "1"
+tokio                     = { version = "1", features = ["full"] }
+anyhow                    = "1"
+uuid                      = { version = "1", features = ["v4"] }
+rusqlite                  = { version = "0.31", features = ["bundled"] }
+which                     = "6"
+glob                      = "0.3"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
