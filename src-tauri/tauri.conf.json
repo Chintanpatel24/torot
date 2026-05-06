@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Torot — Security Agent",
+        "title": "Torot v4 — Bug Bounty Orchestrator",
         "width": 1440,
         "height": 900,
         "minWidth": 900,
@@ -32,15 +32,18 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/32x32.png",
+      "icons/appimage-256.png",
+      "icons/appimage-512.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "Universal Security Agent",
-    "longDescription": "Torot is a universal security research agent for bug bounty hunters and security researchers.",
+    "shortDescription": "Bug bounty orchestration platform",
+    "longDescription": "Torot v4 detects local tools, orchestrates them in parallel, and generates custom Markdown reports for bug bounty workflows.",
     "macOS": {
       "signingIdentity": null
     }
