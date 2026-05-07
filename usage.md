@@ -44,6 +44,24 @@ torot --api etherscan=ABC123 --api github=ghp_TOKEN --api github-repo=owner/repo
 
 ---
 
+## Report templates
+
+Reports use simple `{{placeholder}}` syntax:
+
+| Placeholder | Description |
+|-------------|-------------|
+| `{{session_id}}` | Unique session ID |
+| `{{target}}` | Scan target |
+| `{{created_at}}` | Unix timestamp |
+| `{{findings_total}}` | Total finding count |
+| `{{critical_count}}` | Critical findings |
+| `{{high_count}}` | High findings |
+| `{{summary}}` | Auto-generated summary |
+| `{{tool_overview}}` | Per-tool finding counts |
+| `{{findings_table}}` | Markdown table of all findings |
+
+---
+
 **Keyboard shortcuts:**
 - `Ctrl+C` - quit
 - `Ctrl+L` - clear log
