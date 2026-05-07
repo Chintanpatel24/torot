@@ -12,19 +12,34 @@ import SettingsView from "./components/SettingsView";
 import "./styles/app.css";
 
 export default function App() {
-  const { view, addStreamLine, addFinding, stopScanState, setTools, setDbStats } = useStore();
+  const {
+    view,
+    addStreamLine,
+    addFinding,
+    stopScanState,
+    setTools,
+    setDbStats,
+    setConfig,
+    setAppInfo,
+    setGeneratedReportPath,
+  } = useStore();
 
   useEffect(() => {
-    // Load tools on boot
     api.getTools().then(setTools).catch(() => {});
     api.getDbStats().then(setDbStats).catch(() => {});
+    api.getSettings().then(setConfig).catch(() => {});
+    api.getAppInfo().then(setAppInfo).catch(() => {});
 
-    // Subscribe to backend events
     const unsubs: (() => void)[] = [];
 
     onStreamLine((line) => addStreamLine(line)).then((u) => unsubs.push(u));
     onNewFinding((f)    => addFinding(f)).then((u)    => unsubs.push(u));
-    onScanComplete(()   => stopScanState()).then((u)   => unsubs.push(u));
+    onScanComplete((payload) => {
+      if (payload.report_path) {
+        setGeneratedReportPath(payload.report_path);
+      }
+      stopScanState();
+    }).then((u) => unsubs.push(u));
 
     return () => unsubs.forEach((u) => u());
   }, []);
