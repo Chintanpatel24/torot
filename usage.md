@@ -127,56 +127,6 @@ That's it — the tool auto-appears in `--list-tools`, the wizard, and all scan 
 
 ---
 
-## Architecture
-
-```
-torot/
-  src/                          React frontend (TypeScript)
-    agents/
-      swarm.ts                  Swarm agent orchestration engine
-                                  - QueenCoordinator (hierarchical)
-                                  - CircuitBreaker (resilience)
-                                  - Task dependency graph (waves)
-    rules/
-      engine.ts                 Security rules engine (Lua-inspired DSL)
-                                  - 16 built-in rules across all domains
-                                  - Pattern matching + negation
-                                  - Custom rule loading (JSON)
-    lib/
-      store.ts                  Zustand global state
-      api.ts                    Tauri IPC bridge
-    components/                 UI components
-      Titlebar.tsx              Custom titlebar with inline SVG logo
-      Sidebar.tsx               Navigation sidebar
-      HomeView.tsx              Target + tool selector launch pad
-      ScanView.tsx              Live split terminal view
-      FindingsView.tsx          Findings browser + detail panel
-      HistoryView.tsx           Past sessions (SQLite-backed)
-      ToolsView.tsx             Tool management + install hints
-      SettingsView.tsx          API key storage
-  src-tauri/                    Rust backend (Tauri)
-    src/
-      main.rs                   App entry point
-      lib.rs                    Full backend:
-                                  - 28 tool definitions
-                                  - Async parallel tool execution
-                                  - Real-time stdout/stderr streaming
-                                  - JSON + line-by-line output parsing
-                                  - SQLite memory (sessions + findings + knowledge)
-                                  - Tauri IPC commands
-    tauri.conf.json             App config, window settings, plugin config
-    Cargo.toml                  Rust dependencies
-    icons/                      All platform icons (auto-generated)
-  assets/
-    torot-logo.png              Source logo
-  scripts/
-    gen-icons.sh                Icon generation script (ImageMagick)
-  install.sh                    One-liner universal installer
-  update.sh                     Updater (Torot + all tools)
-```
-
----
-
 ## Building
 
 ### Prerequisites
