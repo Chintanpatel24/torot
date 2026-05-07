@@ -1,7 +1,7 @@
 [package]
 name        = "torot"
-version     = "3.0.0"
-description = "Torot — Universal Security Agent"
+version     = "4.0.0"
+description = "Torot v4 — bug bounty orchestration platform"
 authors     = ["Torot Contributors"]
 license     = "MIT"
 edition     = "2021"
@@ -18,7 +18,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri                     = { version = "2", features = ["macos-private-api"] }
+tauri                     = { version = "2", features = [] }
 tauri-plugin-fs           = "2"
 tauri-plugin-shell        = "2"
 tauri-plugin-dialog       = "2"
