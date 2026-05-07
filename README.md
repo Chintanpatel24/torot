@@ -78,7 +78,7 @@ torot config
 
 ## Tool auto-detection
 
-Torot looks for tools on `PATH` and in any path overrides you set in Settings. Unsupported tools can be added via the Tool Registry in the UI or by editing `~/.torot/config.json`.
+- Torot looks for tools on `PATH` and in any path overrides you set in Settings. Unsupported tools can be added via the Tool Registry in the UI or by editing `~/.torot/config.json`.
 
 ---
 
