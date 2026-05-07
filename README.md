@@ -82,23 +82,4 @@ Torot looks for tools on `PATH` and in any path overrides you set in Settings. U
 
 ---
 
-## Report templates
-
-Reports use simple `{{placeholder}}` syntax:
-
-| Placeholder | Description |
-|-------------|-------------|
-| `{{session_id}}` | Unique session ID |
-| `{{target}}` | Scan target |
-| `{{created_at}}` | Unix timestamp |
-| `{{findings_total}}` | Total finding count |
-| `{{critical_count}}` | Critical findings |
-| `{{high_count}}` | High findings |
-| `{{summary}}` | Auto-generated summary |
-| `{{tool_overview}}` | Per-tool finding counts |
-| `{{findings_table}}` | Markdown table of all findings |
-
-
----
-
 ## For more : [visit usage.md](usage.md)
