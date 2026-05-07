@@ -1,7 +1,7 @@
 {
   "name": "torot",
-  "version": "3.0.0",
-  "description": "Universal Security Agent — Bug Bounty Specialist",
+  "version": "4.0.0",
+  "description": "Autonomous bug bounty orchestration platform with desktop and CLI modes",
   "private": true,
   "type": "module",
   "scripts": {
