@@ -1,10 +1,7 @@
 /**
  * Torot Swarm Agent Engine
- * Inspired by ruflo/claude-flow agent coordination patterns:
- * - Task decomposition (agent-orchestrator-task)
- * - Hierarchical coordination (agent-hierarchical-coordinator)
- * - Circuit breaker resilience (shared/resilience/circuit-breaker)
- * - Memory-backed state (agent-memory-coordinator)
+ * Coordinates parallel tool execution with circuit-breaker resilience,
+ * dependency-wave scheduling, and in-memory state tracking.
  */
 
 export type AgentStatus = "idle" | "running" | "done" | "failed";
@@ -36,7 +33,7 @@ export interface SwarmState {
   running: boolean;
 }
 
-// ─── Circuit Breaker (from ruflo resilience patterns) ─────────────────────────
+// ─── Circuit Breaker ──────────────────────────────────────────────────────────
 
 enum CircuitState { CLOSED, OPEN, HALF_OPEN }
 
@@ -74,7 +71,7 @@ class CircuitBreaker {
   }
 }
 
-// ─── Queen Coordinator (from ruflo queen-coordinator pattern) ─────────────────
+// ─── Queen Coordinator ────────────────────────────────────────────────────────
 
 export class QueenCoordinator {
   private swarm:           SwarmState;
@@ -95,7 +92,6 @@ export class QueenCoordinator {
     };
   }
 
-  // Memory operations (from ruflo memory-coordinator patterns)
   memStore(key: string, value: unknown): void {
     this.swarm.memory.set(key, value);
   }
@@ -112,7 +108,6 @@ export class QueenCoordinator {
     return results;
   }
 
-  // Task registration
   registerTask(task: Omit<AgentTask, "status" | "output">): void {
     this.swarm.tasks.set(task.id, {
       ...task,
@@ -123,7 +118,6 @@ export class QueenCoordinator {
     this.onLog(`[swarm] Registered task: ${task.name} (${task.tool})`);
   }
 
-  // Build execution plan — respects dependencies (from agent-orchestrator-task)
   buildExecutionPlan(): AgentTask[][] {
     const tasks   = Array.from(this.swarm.tasks.values());
     const waves: AgentTask[][] = [];
@@ -134,7 +128,7 @@ export class QueenCoordinator {
       const wave = remaining.filter((t) =>
         t.dependsOn.every((dep) => done.has(dep))
       );
-      if (wave.length === 0) break; // cycle guard
+      if (wave.length === 0) break;
       waves.push(wave.sort((a, b) => b.priority - a.priority));
       wave.forEach((t) => done.add(t.id));
       remaining = remaining.filter((t) => !done.has(t.id));
@@ -145,7 +139,6 @@ export class QueenCoordinator {
     return waves;
   }
 
-  // Run a wave of tasks in parallel (respects maxParallel)
   async runWave(
     wave:      AgentTask[],
     executor:  (task: AgentTask) => Promise<string[]>,
@@ -201,7 +194,6 @@ export class QueenCoordinator {
     }
   }
 
-  // Full orchestrated scan
   async orchestrate(
     executor:  (task: AgentTask) => Promise<string[]>,
     onUpdate:  (task: AgentTask) => void,
@@ -243,42 +235,33 @@ export class QueenCoordinator {
   }
 }
 
-// ─── Plan builder from ruflo agent-goal-planner patterns ─────────────────────
+// ─── Plan builder ─────────────────────────────────────────────────────────────
 
 export function buildScanTasks(
   tools:    string[],
   target:   string,
-  domain:   string,
+  _domain:  string,
 ): Omit<AgentTask, "status" | "output">[] {
   const tasks: Omit<AgentTask, "status" | "output">[] = [];
 
-  // Recon phase (priority 10)
   if (tools.includes("semgrep")) {
     tasks.push({ id: "recon-semgrep", name: "Pattern Analysis", tool: "semgrep", priority: 10, dependsOn: [] });
   }
-  if (tools.includes("strings")) {
-    tasks.push({ id: "recon-strings", name: "String Extraction", tool: "strings", priority: 9, dependsOn: [] });
-  }
 
-  // Static analysis (priority 8, can run in parallel)
   const staticTools = ["slither", "aderyn", "mythril", "solhint", "wake", "solc", "clippy", "cargo-audit"];
   staticTools.filter((t) => tools.includes(t)).forEach((tool, i) => {
     tasks.push({ id: `static-${tool}`, name: `Static: ${tool}`, tool, priority: 8 - i, dependsOn: [] });
   });
 
-  // Dynamic / fuzzing (priority 6, after static)
   const dynamicTools = ["echidna", "manticore", "halmos", "nuclei", "nikto", "ffuf", "gobuster", "sqlmap", "dalfox"];
-  const staticIds = tasks.filter((t) => t.id.startsWith("static")).map((t) => t.id);
   dynamicTools.filter((t) => tools.includes(t)).forEach((tool, i) => {
     tasks.push({ id: `dynamic-${tool}`, name: `Dynamic: ${tool}`, tool, priority: 6 - i, dependsOn: [] });
   });
 
-  // Secret/leak scanning (priority 5)
   ["trufflehog", "gitleaks"].filter((t) => tools.includes(t)).forEach((tool) => {
     tasks.push({ id: `leak-${tool}`, name: `Leak scan: ${tool}`, tool, priority: 5, dependsOn: [] });
   });
 
-  // Binary analysis (priority 4)
   ["radare2", "binwalk", "checksec", "objdump"].filter((t) => tools.includes(t)).forEach((tool, i) => {
     tasks.push({ id: `binary-${tool}`, name: `Binary: ${tool}`, tool, priority: 4 - i, dependsOn: [] });
   });
