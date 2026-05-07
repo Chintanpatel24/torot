@@ -14,7 +14,7 @@
 
 - **Auto-detects** nmap, bbot, nuclei, httpx, subfinder, amass, katana, ffuf, gobuster, nikto, sqlmap, semgrep, trufflehog, gitleaks, and more
 - **Parallel execution** with per-tool timeouts and circuit-breaker resilience
-- **Structured findings** — severity-ranked (CRITICAL → INFO), deduplicated, stored in SQLite
+- **Structured findings** - severity-ranked (CRITICAL → INFO), deduplicated, stored in SQLite
 - **Markdown report generation** with a customisable template
 - **Desktop GUI** (Tauri) and **CLI** in the same binary
 - **Session history** across launches
