@@ -1,17 +1,5 @@
 <div align=center>
-
-<img width="250" alt="torot" src="images/torot.png" />
-
-![Torot](https://img.shields.io/badge/version-3.1.1-amber?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square)
-
-</div>
-
-# Torot
-
-<div align=center>
-
+  
 <img width="250" alt="torot" src="images/torot.png" />
 
 ![Torot](https://img.shields.io/badge/version-3.1.1-amber?style=flat-square)
