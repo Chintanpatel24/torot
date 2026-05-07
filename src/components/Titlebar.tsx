@@ -5,22 +5,25 @@ export default function Titlebar() {
 
   return (
     <div className="titlebar">
-      <div className="titlebar-left">
-        <span className="titlebar-logo">TOROT</span>
-        <span className="titlebar-version">v{appInfo?.version ?? "4.0.0"}</span>
-      </div>
-      <div className="titlebar-right">
+      <span className="titlebar-logo">TOROT</span>
+      <div className="titlebar-sep" />
+      <span className="titlebar-version">v{appInfo?.version ?? "4.0.0"}</span>
+      <div className="titlebar-spacer" />
+      <div className="titlebar-stats">
         {dbStats && (
           <>
             <span className="titlebar-stat">
-              sessions<span>{dbStats.sessions}</span>
+              <span className="titlebar-stat-label">sessions</span>
+              <span className="titlebar-stat-val">{dbStats.sessions}</span>
             </span>
             <span className="titlebar-stat">
-              findings<span>{dbStats.findings}</span>
+              <span className="titlebar-stat-label">findings</span>
+              <span className="titlebar-stat-val">{dbStats.findings}</span>
             </span>
             {dbStats.critical > 0 && (
-              <span className="titlebar-stat" style={{ color: "var(--sev-critical)" }}>
-                critical<span>{dbStats.critical}</span>
+              <span className="titlebar-stat">
+                <span className="titlebar-stat-label">critical</span>
+                <span className="titlebar-stat-val hot">{dbStats.critical}</span>
               </span>
             )}
           </>

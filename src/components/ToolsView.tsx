@@ -5,132 +5,161 @@ import type { ToolProfile } from "../lib/store";
 
 export default function ToolsView() {
   const { tools, setTools } = useStore();
-  const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [search,  setSearch]  = useState("");
+  const [saving,  setSaving]  = useState<string | null>(null);
 
-  const filtered = tools.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.description.toLowerCase().includes(search.toLowerCase())
+  const filtered = tools.filter((t) =>
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    t.description.toLowerCase().includes(search.toLowerCase())
   );
 
-  async function toggleTool(name: string, enabled: boolean) {
+  async function toggleEnabled(name: string, enabled: boolean) {
     const tool = tools.find((t) => t.name === name);
     if (!tool) return;
-    setSaving(true);
+    setSaving(name);
     try {
       const updated = await api.saveToolProfile({ ...tool, enabled } as Partial<ToolProfile>);
       setTools(updated);
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   }
 
+  const installed = tools.filter((t) => t.installed).length;
+
   return (
-    <div style={{ padding: 24, overflow: "auto", height: "100%" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <h2 style={{ color: "var(--text-primary)", fontSize: 15, fontWeight: 700 }}>
-          Tool Registry
-        </h2>
-        <span style={{ color: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-mono)" }}>
-          {tools.filter((t) => t.installed).length}/{tools.length} installed
-        </span>
-        <input
-          type="search"
-          placeholder="Filter tools…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ marginLeft: "auto", width: 200 }}
-        />
+    <div style={{
+      padding: "24px 28px",
+      overflow: "auto",
+      height: "100%",
+      fontFamily: "var(--font-ui)",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+            Tool Registry
+          </div>
+          <div style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--text-muted)",
+            marginTop: 2,
+          }}>
+            {installed}/{tools.length} installed
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto" }}>
+          <input
+            type="search"
+            placeholder="filter tools…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 180, fontFamily: "var(--font-mono)", fontSize: 11 }}
+          />
+        </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Tool list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {filtered.map((tool) => (
           <div
             key={tool.name}
             style={{
-              background: "var(--bg-elevated)",
-              border: `1px solid ${editing === tool.name ? "var(--accent)" : "var(--border-default)"}`,
-              borderRadius: "var(--radius-md)",
-              padding: "12px 14px",
               display: "flex",
               alignItems: "center",
               gap: 12,
+              padding: "9px 12px",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border-faint)",
+              borderRadius: "var(--radius-md)",
+              transition: "border-color 0.1s",
             }}
           >
             {/* Status dot */}
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: tool.installed ? "var(--accent)" : "var(--text-muted)",
-                flexShrink: 0,
-              }}
-            />
+            <span style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: tool.installed ? "var(--green)" : "var(--text-muted)",
+              flexShrink: 0,
+              opacity: tool.installed ? 1 : 0.4,
+            }} />
 
-            {/* Name + desc */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontWeight: 700,
-                    fontSize: 12,
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  {tool.name}
-                </span>
-                <span
-                  style={{
-                    padding: "1px 6px",
-                    borderRadius: 4,
-                    background: "var(--bg-hover)",
-                    fontSize: 10,
-                    color: "var(--text-muted)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
-                  {tool.domain}
-                </span>
-                {tool.source === "custom" && (
-                  <span style={{ fontSize: 10, color: "var(--blue)" }}>custom</span>
-                )}
-              </div>
-              <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                {tool.description}
-              </p>
-              {tool.installed && tool.version && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
-                  {tool.version}
-                </span>
-              )}
-              {!tool.installed && (
-                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                  {tool.install_hint}
+            {/* Name */}
+            <div style={{ width: 90, flexShrink: 0 }}>
+              <span style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+              }}>
+                {tool.name}
+              </span>
+              {tool.source === "custom" && (
+                <span style={{
+                  marginLeft: 5,
+                  fontSize: 9,
+                  color: "var(--blue)",
+                  fontFamily: "var(--font-mono)",
+                }}>
+                  custom
                 </span>
               )}
             </div>
 
+            {/* Domain tag */}
+            <span style={{
+              fontSize: 9,
+              fontFamily: "var(--font-mono)",
+              color: "var(--text-muted)",
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 2,
+              padding: "1px 5px",
+              flexShrink: 0,
+              letterSpacing: "0.06em",
+              width: 58,
+              textAlign: "center" as const,
+            }}>
+              {tool.domain}
+            </span>
+
+            {/* Description */}
+            <span style={{
+              flex: 1,
+              fontSize: 11,
+              color: "var(--text-muted)",
+              whiteSpace: "nowrap" as const,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}>
+              {tool.installed && tool.version
+                ? tool.version
+                : tool.installed
+                ? "installed"
+                : tool.install_hint}
+            </span>
+
             {/* Toggle */}
             <button
-              className={`btn ${tool.enabled ? "btn-secondary" : "btn-secondary"}`}
               style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                opacity: saving ? 0.5 : 1,
-                color: tool.enabled ? "var(--accent)" : "var(--text-muted)",
+                padding: "2px 9px",
+                borderRadius: 2,
+                border: tool.enabled
+                  ? "1px solid var(--green-border)"
+                  : "1px solid var(--border-subtle)",
+                background: tool.enabled ? "var(--green-dim)" : "transparent",
+                color: tool.enabled ? "var(--green)" : "var(--text-muted)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                cursor: "pointer",
+                opacity: saving === tool.name ? 0.5 : 1,
+                letterSpacing: "0.06em",
+                flexShrink: 0,
               }}
-              onClick={() => toggleTool(tool.name, !tool.enabled)}
-              disabled={saving}
+              onClick={() => toggleEnabled(tool.name, !tool.enabled)}
+              disabled={saving === tool.name}
             >
               {tool.enabled ? "enabled" : "disabled"}
             </button>
