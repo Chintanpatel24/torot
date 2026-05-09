@@ -9,7 +9,7 @@
 </div>
 
 # Torot
-
+>Currently it's a contribution only, not for the usages; there are many bugs related to the Rust libraries and need more improvement for the real usage 
 ## Features
 
 - **Auto-detects** nmap, bbot, nuclei, httpx, subfinder, amass, katana, ffuf, gobuster, nikto, sqlmap, semgrep, trufflehog, gitleaks, and more
