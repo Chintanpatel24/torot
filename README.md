@@ -9,7 +9,7 @@
 </div>
 
 # Torot
->Currently it's a contribution only, not for the usages; there are many bugs related to the Rust libraries and need more improvement for the real usage 
+
 ## Features
 
 - **Auto-detects** nmap, bbot, nuclei, httpx, subfinder, amass, katana, ffuf, gobuster, nikto, sqlmap, semgrep, trufflehog, gitleaks, and more
@@ -18,6 +18,9 @@
 - **Markdown report generation** with a customisable template
 - **Desktop GUI** (Tauri) and **CLI** in the same binary
 - **Session history** across launches
+
+>[!NOTE]
+>Currently it's a contribution only, not for the usages; there are many bugs related to the Rust libraries and need more improvement for the real usage 
 
 ## Quick start
 
