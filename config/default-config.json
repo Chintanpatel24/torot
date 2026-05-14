@@ -1,0 +1,23 @@
+{
+  "version": "4.0.0",
+  "install_mode": "both",
+  "default_report_template": "# Torot v4 Report\n\n- Session: `{{session_id}}`\n- Target: `{{target}}`\n- Generated: `{{created_at}}`\n- Findings: `{{findings_total}}`\n- Critical: `{{critical_count}}`\n- High: `{{high_count}}`\n\n## Executive Summary\n{{summary}}\n\n## Tool Coverage\n{{tool_overview}}\n\n## Findings\n{{findings_table}}",
+  "sandbox": {
+    "profile": "strong",
+    "max_runtime_seconds": 900,
+    "allow_network": true,
+    "writable_reports_only": true
+  },
+  "knowledge_topics": [
+    "attack-surface-mapping",
+    "subdomain-enumeration",
+    "web-application-testing",
+    "api-security",
+    "secrets-exposure",
+    "network-recon",
+    "sandbox-aware-execution",
+    "cloud-enumeration",
+    "code-analysis",
+    "social-engineering"
+  ]
+}
