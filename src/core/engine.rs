@@ -236,3 +236,200 @@ async fn run_tool(
         }
     };
 
+    let mut reader_handles: Vec<JoinHandle<Vec<String>>> = Vec::new();
+
+    if let Some(stdout) = child.stdout.take() {
+        let bc = bus.clone();
+        let _sid = session_id.to_string();
+        let tool = profile.name.clone();
+        reader_handles.push(tokio::spawn(async move { stream_reader(stdout, bc, tool).await }));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        let bc = bus.clone();
+        let _sid = session_id.to_string();
+        let tool = profile.name.clone();
+        reader_handles.push(tokio::spawn(async move { stream_reader(stderr, bc, tool).await }));
+    }
+
+    let wait_result = tokio::time::timeout(Duration::from_secs(max_runtime_seconds), child.wait()).await;
+    if wait_result.is_err() {
+        let _ = child.kill().await;
+        bus.emit(AppEvent::Line {
+            tool: profile.name.clone(),
+            line: format!("Timed out after {max_runtime_seconds} seconds."),
+            kind: "system".to_string(),
+            severity: Some("HIGH".to_string()),
+        });
+    }
+
+    let mut output_lines = Vec::new();
+    for handle in reader_handles {
+        if let Ok(lines) = handle.await {
+            output_lines.extend(lines);
+        }
+    }
+
+    let combined = output_lines.join("\n");
+    let findings = parse_output(session_id, profile, &combined);
+
+    for finding in &findings {
+        db::insert_finding(&state.db.lock().unwrap(), finding);
+        if let Some(session) = state.sessions.lock().unwrap().get_mut(session_id) {
+            session.findings.push(finding.clone());
+        }
+        bus.emit(AppEvent::Finding(finding.clone()));
+    }
+
+    bus.emit(AppEvent::Line {
+        tool: profile.name.clone(),
+        line: format!("{} complete with {} parsed finding(s).", profile.name, findings.len()),
+        kind: "system".to_string(),
+        severity: None,
+    });
+}
+
+async fn stream_reader<R: tokio::io::AsyncRead + Unpin>(reader: R, bus: EventBus, tool: String) -> Vec<String> {
+    let mut lines = BufReader::new(reader).lines();
+    let mut output = Vec::new();
+    while let Ok(Some(line)) = lines.next_line().await {
+        if line.trim().is_empty() {
+            continue;
+        }
+        bus.emit(AppEvent::Line {
+            tool: tool.clone(),
+            line: line.clone(),
+            kind: "output".to_string(),
+            severity: None,
+        });
+        output.push(line);
+    }
+    output
+}
+
+async fn run_tool_cli(session_id: &str, target: &str, profile: ToolProfile, reports_dir: std::path::PathBuf) -> Vec<Finding> {
+    let runtime = detect_tool(&profile);
+    let Some(binary) = runtime.binary else {
+        eprintln!("{} missing: {}", profile.name, profile.install_hint);
+        return Vec::new();
+    };
+    let report_file = reports_dir.join(format!("{}-{}.out", session_id, profile.name));
+    let Some(args) = render_args(&profile, target, &report_file) else {
+        eprintln!("{} skipped: incompatible target type", profile.name);
+        return Vec::new();
+    };
+
+    println!("[torot] {} {}", profile.name, args.join(" "));
+
+    let output = tokio::time::timeout(
+        Duration::from_secs(profile.timeout_seconds.max(30)),
+        TokioCommand::new(&binary).args(&args).output(),
+    )
+    .await;
+
+    match output {
+        Ok(Ok(result)) => {
+            let mut text = String::from_utf8_lossy(&result.stdout).to_string();
+            if !result.stderr.is_empty() {
+                if !text.is_empty() {
+                    text.push('\n');
+                }
+                text.push_str(&String::from_utf8_lossy(&result.stderr));
+            }
+            parse_output(session_id, &profile, &text)
+        }
+        Ok(Err(err)) => {
+            eprintln!("{} failed: {err}", profile.name);
+            Vec::new()
+        }
+        Err(_) => {
+            eprintln!("{} timed out", profile.name);
+            Vec::new()
+        }
+    }
+}
+
+pub async fn run_pipeline_cli(
+    state: Arc<AppState>,
+    request: ScanRequest,
+    config: crate::core::types::AppConfig,
+) -> anyhow::Result<String> {
+    let session = Session::new(&request.target, &request.mode);
+    let session_id = session.id.clone();
+    state
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), session.clone());
+
+    db::insert_session(
+        &state.db.lock().unwrap(),
+        &session_id,
+        &request.target,
+        crate::core::tools::infer_target_kind(&request.target),
+        session.start_time,
+    );
+
+    let selected = if request.tools.is_empty() {
+        suggest_tools(&config, &request.target)
+    } else {
+        request.tools.clone()
+    };
+
+    let tools_by_name: HashMap<String, ToolProfile> = config
+        .tools
+        .iter()
+        .cloned()
+        .map(|tool| (tool.name.clone(), tool))
+        .collect();
+
+    let mut handles: Vec<JoinHandle<Vec<Finding>>> = Vec::new();
+    for tool_name in selected {
+        if let Some(profile) = tools_by_name.get(&tool_name).cloned() {
+            let target = request.target.clone();
+            let reports_dir = state.reports_dir.clone();
+            let sid = session_id.clone();
+            handles.push(tokio::spawn(async move {
+                run_tool_cli(&sid, &target, profile, reports_dir).await
+            }));
+        }
+    }
+
+    let mut findings = Vec::new();
+    for handle in handles {
+        if let Ok(tool_findings) = handle.await {
+            findings.extend(tool_findings);
+        }
+    }
+
+    {
+        let mut sessions = state.sessions.lock().unwrap();
+        if let Some(current) = sessions.get_mut(&session_id) {
+            current.findings = findings.clone();
+        }
+    }
+
+    {
+        let db = state.db.lock().unwrap();
+        for finding in &findings {
+            db::insert_finding(&db, finding);
+        }
+        db::update_session(&db, &session_id, now_unix(), findings.len() as u32, &summarize_findings(&findings));
+    }
+
+    let template = request
+        .report_template
+        .clone()
+        .filter(|t| !t.trim().is_empty())
+        .unwrap_or(config.default_report_template.clone());
+
+    let report_path = request
+        .report_output_path
+        .clone()
+        .unwrap_or_else(|| state.reports_dir.join(format!("{session_id}.md")).to_string_lossy().to_string());
+
+    let markdown = render_report(&template, &session, &findings);
+    fs::write(&report_path, &markdown)?;
+    println!("[torot] report written to {report_path}");
+    println!("[torot] {}", summarize_findings(&findings));
+    Ok(session_id)
+}
