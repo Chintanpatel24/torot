@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TOROT_VERSION="4.0.0"
-BINARY_URL="https://github.com/Chintanpatel24/torot/releases/download/v${TOROT_VERSION}/torot-$(uname -s)-$(uname -m).tar.gz"
+BINARY_URL="https://github.com/torot/torot/releases/download/v${TOROT_VERSION}/torot-$(uname -s)-$(uname -m).tar.gz"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 info()  { printf "\033[32m->\033[0m %s\n" "$*"; }
